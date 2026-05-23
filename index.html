@@ -8,36 +8,48 @@
  </head>
  <body>
     <nav>
-        <img src="assets/images/StudySync.png" alt="logo" class="hero-logo">
-        <ul class="nav-links">
-            <li><a href="#features">Features</a></li>
-            <li><a href="#how-it-works">How It Works</a></li>
-            <li><a href="#pricing">Pricing</a></li>
-            <li><a href="login.html">Sign Up/Log In</a></li>
-        </ul>
-    </nav>
+    <div class="nav-brand">
+        <img src="assets/images/StudySync1.png" alt="logo" class="hero-logo">
+
+    </div>
+    <ul class="nav-links">
+        <li><a href="#features">Features</a></li>
+        <li><a href="#how-it-works">How It Works</a></li>
+        <li><a href="#pricing">Pricing</a></li>
+        <li><a href="login.html" class="nav-login">Log In</a></li>
+        <li><a href="login.html" class="nav-signup">Sign Up</a></li>
+    </ul>
+</nav>
 
     <section id="hero">
         <h1>Study Smarter. Focus Deeper.</h1>
-        <button type="button" id="studying-btn" > Start Studying</button>
-        <button type="button" id="how-it-works-btn"> See How It Works</button>
+        <p class="hero-subtext">The productivity platform built for students who want to focus, stay consistent, and achieve more.</p>
+        <button type="button" id="studying-btn">Start Studying</button>
+        <button type="button" id="how-it-works-btn">See How It Works</button>
     </section>
 
     <section id="features">
-        
-        <div class="card">
-            <h3>Focus mode</h3>
-            <p>Fullscreen timer with ambient sounds</p>
-        </div>
+        <h2>Everything you need to focus</h2>
+        <div class="cards-container">
+            <div class="card">
+                <div class="card-icon">⏱️</div>
+                <h3>Focus mode</h3>
+                <p>Fullscreen timer with ambient sounds</p>
+            </div>
 
-        <div class="card">
-            <h3>Session planner</h3>
-            <p>Set your study and break cycles</p>
-        </div>
+            <div class="card">
+                <div class="card-icon">📅</div>
+                <h3>Session planner</h3>
+                <p>Set your study and break cycles</p>
         
-        <div class="card">
-            <h3>Progress tracking</h3>
-            <p>Streaks, stats and session history</p>
+            </div>
+        
+            <div class="card">
+                <div class="card-icon">📊</div>
+                <h3>Progress tracking</h3>
+                <p>Streaks, stats and session history</p>
+        
+            </div>
         </div>
     </section>
 
@@ -94,7 +106,7 @@
         </div>
 
         <div class="footer-bottom">
-            <p> &copy; 2026 StudySync - A product of Mgangela Technologies</p>
+            <p> &copy; 2026 StudySync - Where focus becomes a habit. A product of Mgangela Technologies</p>
         </div>
 
     </footer>
