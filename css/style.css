@@ -189,3 +189,152 @@ nav {
     font-weight: bold;
     margin: 0 auto 15px auto;
 }
+
+#why-studysync {
+    text-align: center;
+    padding: 60px 40px;
+    background: #0a0f1e;
+}
+
+#why-studysync h2 {
+    font-size: 36px;
+    margin-bottom: 10px;
+}
+
+#why-studysync .section-subtext {
+    color: #94a3b8;
+    margin-bottom: 40px;
+    font-size: 16px;
+}
+
+.stats-container {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+}
+
+.stat-card {
+    background: #1e293b;
+    padding: 30px 25px;
+    border-radius: 15px;
+    max-width: 280px;
+    flex: 1;
+    transition: transform 0.3s;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+}
+
+.stat-card h3 {
+    font-size: 36px;
+    margin-bottom: 12px;
+}
+
+.stat-card h4 {
+    color: #e2e8f0;
+    font-size: 18px;
+    margin-bottom: 10px;
+}
+
+.stat-card p {
+    color: #94a3b8;
+    font-size: 14px;
+}
+
+#cta{
+    text-align: center;
+    padding: 80px 40px;
+    background: #0f172a;
+}
+
+#cta h2{
+    font-size: 36px;
+    margin-bottom: 15px;
+}
+
+#cta p{
+    color: #94a3b8;
+    margin-bottom: 30px;
+    font-size: 16px;
+}
+
+#cta button {
+    background: #C9922A;
+    color: white;
+    padding: 15px 40px;
+    border-radius: 25px;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: bold;
+    transition: background 0.3s;
+}
+
+#cta button:hover {
+    background: #a0701a;
+}
+
+.footer{
+    background: #0a0f1e;
+    padding: 60px 40px;
+    color: #94a3b8;
+}
+.footer-top{
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 40px;
+    padding-bottom: 40px;
+    border-bottom: 1px solid #1e293b;
+}
+
+.footer-brand {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 250px;
+}
+
+.footer-brand p {
+    font-size: 13px;
+    color: #475569;
+}
+
+.footer-links-group{
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.footer-links-group h5{
+    color: #e2e8f0;
+    margin-bottom: 8px;
+    font-size: 14px;
+    letter-spacing: 1px;
+}
+.footer-links-group ul{
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.footer-links-group a{
+    text-decoration: none;
+    color: #94a3b8;
+    font-size: 13px;
+}
+
+.footer-bottom{
+    text-align: center;
+    padding-top: 20px;
+    font-size: 13px;
+    color: #475569;
+}
+
+.footer-bottom p {
+    margin-top: 5px;
+}
