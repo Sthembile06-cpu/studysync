@@ -356,3 +356,75 @@ nav {
 .footer-bottom p {
     margin-top: 5px;
 }
+
+#auth {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    background-color: #0f172a;
+}
+
+.auth-container {
+    width: 100%;
+    max-width: 420px;
+}
+
+.auth-card {
+    background: #1e293b;
+    padding: 40px;
+    border-radius: 15px;
+}
+
+.auth-card h2{
+    margin-bottom: 8px;
+    font-size: 26px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 20px;
+    margin-top: 20px;
+}
+
+.form-group label{
+    font-size: 13px;
+    color: #94a3b8;
+    margin-bottom: 6px;
+}
+
+.form-group input{
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #334155;
+    background: #0f172a;
+    color: #e2e8f0;
+    font-size: 14px;
+}
+
+.auth-btn{
+    width: 100%;
+    padding: 14px;
+    background: #378ADD;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: bold;
+    margin-top: 10px;
+}
+
+.auth-switch{
+    text-align: center;
+    margin-top: 20px;
+    font-size: 13px;
+    color: #94a3b8;
+}
+
+.auth-switch span{
+    color: #378ADD;
+    cursor: pointer;
+}
