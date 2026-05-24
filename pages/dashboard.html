@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - StudySync</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+    <nav class="dashboard-nav">
+        <div class="nav-brand">
+            <img src="../assets/images/StudySync1.png" alt="logo" class="hero-logo">
+        </div>
+        <div class="dashboard-nav-right">
+            <span class="welcome-text" id="welcome-name">Good morning 👋</span>
+            <a href="login.html" class="nav-logout">Log Out</a>
+        </div>
+    </nav>
+
+    <div class="dashboard-body">
+
+        <aside class="sidebar">
+            <ul class="sidebar-links">
+                <li class="active"><a href="dashboard.html">🏠 Dashboard</a></li>
+                <li><a href="session.html">▶️ New Session</a></li>
+                <li><a href="statistics.html">📊 Statistics</a></li>
+                <li><a href="history.html">🕐 History</a></li>
+                <li><a href="achievements.html">⭐ Achievements</a></li>
+                <li><a href="settings.html">⚙️ Settings</a></li>
+                <li><a href="profile.html">👤 Profile</a></li>
+            </ul>
+        </aside>
+
+        <main class="dashboard-main">
+            <h2 id="welcome-heading">Good morning 👋</h2>
+            <p class="section-subtext">Ready to focus today?</p>
+
+            <!-- STATS ROW -->
+            <div class="stats-row">
+                <div class="stat-box">
+                    <h3 id="streak-count">0</h3>
+                    <p>Day streak 🔥</p>
+                </div>
+                <div class="stat-box">
+                    <h3 id="hours-count">0h</h3>
+                    <p>This month</p>
+                </div>
+                <div class="stat-box">
+                    <h3 id="sessions-count">0</h3>
+                    <p>Sessions done</p>
+                </div>
+            </div>
+
+            <!-- QUICK START -->
+            <div class="dashboard-card">
+                <h3>Quick start</h3>
+                <p>Choose a session preset to get started immediately</p>
+                <div class="preset-buttons">
+                    <button type="button" class="preset-btn">Pomodoro 25/5</button>
+                    <button type="button" class="preset-btn">Deep work 90m</button>
+                    <button type="button" class="preset-btn">2h study / 30m break</button>
+                    <button type="button" class="preset-btn">⚙️ Custom session</button>
+                </div>
+            </div>
+
+            <!-- RECENT SESSIONS -->
+            <div class="dashboard-card">
+                <h3>Recent sessions</h3>
+                <div id="recent-sessions">
+                    <p class="section-subtext">No sessions yet. Start your first session!</p>
+                </div>
+            </div>
+
+        </main>
+
+    </div>
+
+</body>
+</html>
