@@ -105,10 +105,28 @@ nav {
     color: white;
 }
 
-#features {
+#about {
     text-align: center;
     padding: 60px 40px;
     background: #0a0f1e;
+}
+
+#about h2{
+    font-size: 36px;
+    margin-bottom: 10px;
+}
+
+#about .section-subtext{
+    color: #94a3b8;
+    font-size: 16px;
+    max-width: 700px;
+    margin: 0 auto 15px auto;
+}
+
+#features {
+    text-align: center;
+    padding: 60px 40px;
+    background: #0f172a;
 }
 
 .card {
@@ -146,7 +164,7 @@ nav {
 #how-it-works{
     align-items: center;
     padding: 60px 40px;
-    background: #0f172a;
+    background: #0a0f1e;
     text-align: center;
 }
 
@@ -193,7 +211,7 @@ nav {
 #why-studysync {
     text-align: center;
     padding: 60px 40px;
-    background: #0a0f1e;
+    background: #0f172a;
 }
 
 #why-studysync h2 {
@@ -247,7 +265,7 @@ nav {
 #cta{
     text-align: center;
     padding: 80px 40px;
-    background: #0f172a;
+    background: #0a0f1e;
 }
 
 #cta h2{
@@ -278,7 +296,7 @@ nav {
 }
 
 .footer{
-    background: #0a0f1e;
+    background: #0f172a;
     padding: 60px 40px;
     color: #94a3b8;
 }
