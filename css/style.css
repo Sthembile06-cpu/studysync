@@ -586,3 +586,48 @@ nav {
     border-radius: 20px;
     font-size: 11px;
 }
+
+.duration-options{
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+    flex-wrap: wrap;
+}
+
+.duration-btn {
+    background: #0f172a;
+    color: #94a3b8;
+    border: 1px solid #334155;
+    padding: 8px 16px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.3s;
+}
+
+.active-duration{
+    background: #378ADD;
+    color: white;
+    border-color: #378ADD;
+}
+
+.form-label{
+    font-size: 13px;
+    color: #94a3b8;
+    display: block;
+    margin-bottom: 6px;
+}
+
+#start-session-btn{
+    background: #C9922A;
+    color: white;
+    padding: 15px 40px;
+    border-radius: 25px;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: bold;
+    transition: background 0.3s;
+    width: 100%;
+    margin-top: 20px;
+}

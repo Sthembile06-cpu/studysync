@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Session Setup - StudySync</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+    <nav class="dashboard-nav">
+        <div class="nav-brand">
+            <img src="../assets/images/StudySync1.png" alt="logo" class="hero-logo">
+        </div>
+        <div class="dashboard-nav-right">
+            <span class="welcome-text" id="welcome-name"></span>
+            <a href="login.html" class="nav-logout">Log Out</a>
+        </div>
+    </nav>
+
+   <div class="dashboard-body">
+
+        <aside class="sidebar">
+            <ul class="sidebar-links">
+                <li><a href="dashboard.html">🏠 Dashboard</a></li>
+                <li class="active"><a href="session.html">▶️ New Session</a></li>
+                <li><a href="statistics.html">📊 Statistics</a></li>
+                <li><a href="history.html">🕐 History</a></li>
+                <li><a href="achievements.html">⭐ Achievements</a></li>
+                <li><a href="settings.html">⚙️ Settings</a></li>
+                <li><a href="profile.html">👤 Profile</a></li>
+            </ul>
+        </aside>
+
+        <main class="dashboard-main">
+            <h2>Set up your session</h2>
+            <p class="section-subtext">Configure your study session before you begin</p>
+
+            <div class="dashboard-card">
+                <h3>Study duration</h3>
+                <div class="duration-options">
+                    <button type="button" class="duration-btn active-duration">25 min</button>
+                    <button type="button" class="duration-btn">50 min</button>
+                    <button type="button" class="duration-btn">90 min</button>
+                    <button type="button" class="duration-btn">120 min</button>
+                    <button type="button" class="duration-btn">Custom</button>
+                </div>
+                <div id="custom-study" style="display:none; margin-top:15px;">
+                    <label class="form-label">Enter minutes</label>
+                    <input type="number" id="custom-study-input" placeholder="e.g. 45" min="1" max="300">
+                </div>
+            </div>
+
+            <div class="dashboard-card">
+                <h3>Break duration</h3>
+                <div class="duration-options">
+                    <button type="button" class="duration-btn active-duration">5 min</button>
+                    <button type="button" class="duration-btn">10 min</button>
+                    <button type="button" class="duration-btn">15 min</button>
+                    <button type="button" class="duration-btn">30 min</button>
+                    <button type="button" class="duration-btn">Custom</button>
+                </div>
+                <div id="custom-break" style="display:none; margin-top:15px;">
+                    <label class="form-label">Enter minutes</label>
+                    <input type="number" id="custom-break-input" placeholder="e.g. 20" min="1" max="60">
+                </div>
+            </div>
+
+            <div class="dashboard-card">
+                <h3>Number of cycles</h3>
+                <p class="section-subtext">How many study + break rounds?</p>
+                <div class="duration-options">
+                    <button type="button" class="duration-btn active-duration">1</button>
+                    <button type="button" class="duration-btn">2</button>
+                    <button type="button" class="duration-btn">3</button>
+                    <button type="button" class="duration-btn">4</button>
+                    <button type="button" class="duration-btn">6</button>
+                    <button type="button" class="duration-btn">8</button>
+                </div>
+            </div>
+
+            <div class="dashboard-card">
+                <h3>Ambient sound</h3>
+                <div class="duration-options">
+                    <button type="button" class="duration-btn active-duration">🌧️ Rain</button>
+                    <button type="button" class="duration-btn">📚 Library</button>
+                    <button type="button" class="duration-btn">🌊 White noise</button>
+                    <button type="button" class="duration-btn">🎵 Lo-fi</button>
+                    <button type="button" class="duration-btn">🔇 None</button>
+                </div>
+            </div>
+
+            <button type="button" id="start-session-btn">Start Focus Session →</button>
+
+        </main>
+
+    </div>
+<script src="../js/greeting.js"></script>
+</body>
+</html>
