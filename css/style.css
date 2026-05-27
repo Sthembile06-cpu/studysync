@@ -631,3 +631,146 @@ nav {
     width: 100%;
     margin-top: 20px;
 }
+
+.focus-body {
+    background: #0a0f1e;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.focus-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    width: 100%;
+    padding: 40px 20px;
+    text-align: center;
+}
+
+.focus-topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    max-width: 800px;
+    margin-bottom: 40px;
+}
+
+.focus-logo {
+    font-size: 20px;
+    font-weight: bold;
+    color: #378ADD;
+}
+
+.focus-cycle {
+    font-size: 13px;
+    color: #94a3b8;
+    letter-spacing: 2px;
+}
+
+.focus-exit-btn {
+    background: transparent;
+    border: 1px solid #334155;
+    color: #94a3b8;
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.3s;
+}
+
+.focus-exit-btn:hover {
+    border-color: #e24b4a;
+    color: #e24b4a;
+}
+
+.focus-timer-section {
+    margin-bottom: 40px;
+}
+
+.focus-mode-label {
+    font-size: 12px;
+    letter-spacing: 4px;
+    color: #378ADD;
+    margin-bottom: 30px;
+}
+
+.focus-timer-ring {
+    width: 250px;
+    height: 250px;
+    border-radius: 50%;
+    border: 6px solid #1e293b;
+    border-top-color: #378ADD;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 30px auto;
+}
+
+.focus-timer-display {
+    font-size: 56px;
+    font-weight: bold;
+    color: #e2e8f0;
+}
+
+.focus-progress-bar {
+    width: 300px;
+    height: 6px;
+    background: #1e293b;
+    border-radius: 6px;
+    margin: 0 auto;
+    overflow: hidden;
+}
+
+.focus-progress-fill {
+    height: 6px;
+    background: #378ADD;
+    border-radius: 6px;
+    width: 0%;
+    transition: width 1s linear;
+}
+
+.focus-quote {
+    font-size: 15px;
+    color: #94a3b8;
+    font-style: italic;
+    max-width: 500px;
+    margin-bottom: 40px;
+    line-height: 1.6;
+}
+
+.focus-controls {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 30px;
+}
+
+.focus-controls button {
+    background: transparent;
+    border: 1px solid #334155;
+    color: #94a3b8;
+    padding: 10px 24px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.3s;
+}
+
+.focus-controls button:hover {
+    background: #1e293b;
+    color: #e2e8f0;
+}
+
+#end-btn:hover {
+    border-color: #e24b4a;
+    color: #e24b4a;
+}
+
+.focus-sound {
+    font-size: 13px;
+    color: #475569;
+}
