@@ -10,6 +10,42 @@ const quotes = [
     "Don't watch the clock. Do what it does — keep going. — Sam Levenson"
 ];
 
+// prevent screen from sleeping
+let wakeLock = null;
+
+async function requestWakeLock() {
+    try {
+        wakeLock = await navigator.wakeLock.request('screen');
+        console.log('Wake lock active');
+    } catch (error) {
+        console.log('Wake lock error:', error);
+    }
+}
+
+async function releaseWakeLock() {
+    if (wakeLock) {
+        await wakeLock.release();
+        wakeLock = null;
+        console.log('Wake lock released');
+    }
+}
+
+// unlock audio on first user interaction
+let audioUnlocked = false;
+
+function unlockAudio() {
+    if (!audioUnlocked) {
+        const silentAudio = new Audio('../assets/sounds/alarm.mp3');
+        silentAudio.volume = 0;
+        silentAudio.play().then(() => {
+            silentAudio.pause();
+            audioUnlocked = true;
+        }).catch(() => {});
+    }
+}
+
+document.addEventListener('click', unlockAudio, { once: false });
+
 // read settings from localStorage
 const studyTime = localStorage.getItem('studyTime') || '25 min';
 const breakTime = localStorage.getItem('breakTime') || '5 min';
@@ -90,28 +126,28 @@ function updateCycleDisplay() {
 }
 
 // alarm sound
-const alarm = new Audio('../assets/sounds/alarm.mp3');
-
 function playAlarm() {
-    alarm.currentTime = 0;
-    alarm.play();
+    const alarmSound = new Audio('../assets/sounds/alarm.mp3');
+    alarmSound.volume = 1.0;
+    alarmSound.play().catch(function(error) {
+        console.log('Alarm error:', error);
+    });
 }
 
 function switchMode() {
     playAlarm();
-    
+
     if (isStudying) {
         isStudying = false;
         timeLeft = breakMinutes * 60;
         totalTime = breakMinutes * 60;
 
-        // visual change for break
         document.getElementById('focus-mode-label').textContent = 'BREAK TIME ☕';
         document.body.style.background = '#0a1a0a';
         document.querySelector('.focus-timer-ring').style.borderTopColor = '#C9922A';
         document.querySelector('.focus-progress-fill').style.background = '#C9922A';
         document.getElementById('focus-quote').textContent = '"Take a deep breath. You earned this break."';
-        
+
         stopSound();
 
     } else {
@@ -126,12 +162,11 @@ function switchMode() {
         timeLeft = studyMinutes * 60;
         totalTime = studyMinutes * 60;
 
-        // visual change back to study
         document.getElementById('focus-mode-label').textContent = 'FOCUS SESSION';
         document.body.style.background = '#0a0f1e';
         document.querySelector('.focus-timer-ring').style.borderTopColor = '#378ADD';
         document.querySelector('.focus-progress-fill').style.background = '#378ADD';
-        
+
         playSound();
         setQuote();
         updateCycleDisplay();
@@ -142,17 +177,25 @@ function switchMode() {
 function endSession() {
     clearInterval(timerInterval);
     stopSound();
+    releaseWakeLock();
     alert('Session complete! Well done! 🎉');
     window.location.href = 'dashboard.html';
 }
 
 // main timer tick
 function tick() {
+    timeLeft--;
+
     if (timeLeft <= 0) {
+        clearInterval(timerInterval);
+        timeLeft = 0;
+        document.getElementById('timer-display').textContent = formatTime(timeLeft);
+        updateProgress();
         switchMode();
+        if (!isPaused) startTimer();
         return;
     }
-    timeLeft--;
+
     document.getElementById('timer-display').textContent = formatTime(timeLeft);
     updateProgress();
 }
@@ -195,6 +238,7 @@ document.getElementById('end-btn').addEventListener('click', function() {
 document.querySelector('.focus-exit-btn').addEventListener('click', function() {
     if (confirm('Are you sure you want to exit?')) {
         stopSound();
+        releaseWakeLock();
         window.location.href = 'session.html';
     }
 });
@@ -205,3 +249,4 @@ updateCycleDisplay();
 document.getElementById('timer-display').textContent = formatTime(timeLeft);
 playSound();
 startTimer();
+requestWakeLock();
