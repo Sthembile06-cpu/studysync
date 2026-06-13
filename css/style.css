@@ -1064,3 +1064,210 @@ nav {
     font-size: 12px;
     color: #e2e8f0;
 }
+
+/* ===== RESPONSIVE DESIGN ===== */
+
+/* Tablets (768px and below) */
+@media (max-width: 768px) {
+
+    /* Navigation */
+    nav, .dashboard-nav {
+        padding: 10px 15px;
+    }
+
+    .hero-logo {
+        width: 150px;
+        height: 35px;
+    }
+
+    .nav-links {
+        gap: 15px;
+    }
+
+    .nav-links a {
+        font-size: 12px;
+    }
+
+    /* Hero section */
+    #hero {
+        padding: 60px 20px;
+    }
+
+    #hero h1 {
+        font-size: 32px;
+    }
+
+    .hero-subtext {
+        font-size: 15px;
+    }
+
+    #studying-btn, #how-it-works-btn {
+        padding: 12px 20px;
+        margin: 10px;
+    }
+
+    /* Features */
+    #features {
+        padding: 40px 20px;
+    }
+
+    .cards-container {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .card {
+        max-width: 100%;
+        width: 100%;
+    }
+
+    /* How it works */
+    #how-it-works {
+        padding: 40px 20px;
+    }
+
+    .steps-container {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .step {
+        max-width: 100%;
+    }
+
+    /* Why StudySync */
+    #why-studysync {
+        padding: 40px 20px;
+    }
+
+    .stats-container {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .stat-card {
+        max-width: 100%;
+        width: 100%;
+    }
+
+    /* Footer */
+    .footer {
+        padding: 40px 20px;
+    }
+
+    .footer-top {
+        flex-direction: column;
+        gap: 30px;
+    }
+
+    /* Dashboard */
+    .dashboard-body {
+        flex-direction: column;
+    }
+
+    .sidebar {
+        width: 100%;
+        padding: 10px 15px;
+    }
+
+    .sidebar-links {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 5px;
+    }
+
+    .sidebar-links a {
+        font-size: 12px;
+        padding: 6px 10px;
+    }
+
+    .dashboard-main {
+        padding: 20px 15px;
+    }
+
+    .stats-row {
+        flex-direction: column;
+    }
+
+    .stat-box {
+        width: 100%;
+    }
+
+    /* Session setup */
+    .duration-options {
+        flex-wrap: wrap;
+    }
+
+    /* Focus mode */
+    .focus-timer-ring {
+        width: 180px;
+        height: 180px;
+    }
+
+    .focus-timer-display {
+        font-size: 40px;
+    }
+
+    .focus-controls {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    /* Auth page */
+    .auth-card {
+        padding: 25px 20px;
+    }
+}
+
+/* Mobile (480px and below) */
+@media (max-width: 480px) {
+
+    /* Navigation — hide text links on very small screens */
+    .nav-links li:not(:last-child):not(:nth-last-child(2)) {
+        display: none;
+    }
+
+    #hero h1 {
+        font-size: 26px;
+    }
+
+    #hero {
+        padding: 40px 15px;
+    }
+
+    .focus-topbar {
+        flex-wrap: wrap;
+        gap: 10px;
+        justify-content: center;
+    }
+
+    .focus-timer-ring {
+        width: 150px;
+        height: 150px;
+    }
+
+    .focus-timer-display {
+        font-size: 32px;
+    }
+
+    .focus-progress-bar {
+        width: 200px;
+    }
+
+    .achievements-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .dashboard-card {
+        padding: 15px;
+    }
+
+    .preset-buttons {
+        flex-direction: column;
+    }
+
+    .preset-btn {
+        width: 100%;
+        text-align: center;
+    }
+}
