@@ -125,8 +125,10 @@ function updateCycleDisplay() {
     document.querySelector('.focus-cycle').textContent = 'Cycle ' + currentCycle + ' of ' + totalCycles;
 }
 
-// alarm sound
 function playAlarm() {
+    const alarmOn = localStorage.getItem('alarmOn') !== 'false';
+    if (!alarmOn) return; // don't play if turned off
+
     const alarmSound = new Audio('../assets/sounds/alarm.mp3');
     alarmSound.volume = 1.0;
     alarmSound.play().catch(function(error) {
