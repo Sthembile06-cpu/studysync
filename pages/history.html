@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>History - StudySync</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+    <nav class="dashboard-nav">
+        <div class="nav-brand">
+            <img src="../assets/images/StudySync1.png" alt="logo" class="hero-logo">
+        </div>
+        <div class="dashboard-nav-right">
+            <span class="welcome-text" id="welcome-name"></span>
+            <a href="login.html" class="nav-logout">Log Out</a>
+        </div>
+    </nav>
+
+    <div class="dashboard-body">
+
+        <aside class="sidebar">
+            <ul class="sidebar-links">
+                <li><a href="dashboard.html">🏠 Dashboard</a></li>
+                <li><a href="session.html">▶️ New Session</a></li>
+                <li><a href="statistics.html">📊 Statistics</a></li>
+                <li class="active"><a href="history.html">🕐 History</a></li>
+                <li><a href="achievements.html">⭐ Achievements</a></li>
+                <li><a href="settings.html">⚙️ Settings</a></li>
+                <li><a href="profile.html">👤 Profile</a></li>
+            </ul>
+        </aside>
+
+        <main class="dashboard-main">
+            <h2>Session history</h2>
+            <p class="section-subtext">A record of all your past study sessions</p>
+            
+            <div class="history-filters">
+                <button type="button" class="filter-btn active-filter">All</button>
+                <button type="button" class="filter-btn">This week</button>
+                <button type="button" class="filter-btn">This month</button>
+            </div>
+            
+            <div class="dashboard-card">
+                <div id="history-list">
+                    <div class="empty-state">
+                        <p>📭 No sessions yet.</p>
+                        <p class="section-subtext">Complete your first study session to see your history here.</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+<script src="../js/greeting.js"></script>
+</body>
+</html>

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Achievements - StudySync</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+    <nav class="dashboard-nav">
+        <div class="nav-brand">
+            <img src="../assets/images/StudySync1.png" alt="logo" class="hero-logo">
+        </div>
+        <div class="dashboard-nav-right">
+            <span class="welcome-text" id="welcome-name"></span>
+            <a href="login.html" class="nav-logout">Log Out</a>
+        </div>
+    </nav>
+
+    <div class="dashboard-body">
+
+        <aside class="sidebar">
+            <ul class="sidebar-links">
+                <li><a href="dashboard.html">🏠 Dashboard</a></li>
+                <li><a href="session.html">▶️ New Session</a></li>
+                <li><a href="statistics.html">📊 Statistics</a></li>
+                <li><a href="history.html">🕐 History</a></li>
+                <li class="active"><a href="achievements.html">⭐ Achievements</a></li>
+                <li><a href="settings.html">⚙️ Settings</a></li>
+                <li><a href="profile.html">👤 Profile</a></li>
+            </ul>
+        </aside>
+
+        <main class="dashboard-main">
+            <h2>Achievements</h2>
+            <p class="section-subtext">Earn badges by building consistent study habits</p>
+            
+            <div class="dashboard-card">
+                <h3>Your progress</h3>
+                <div class="achievement-progress">
+                    <span id="achievements-count">0 / 10 unlocked</span>
+                    <div class="achievement-bar">
+                        <div class="achievement-bar-fill" id="achievement-bar-fill" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="dashboard-card">
+                <h3>All achievements</h3>
+                <div class="achievements-grid">
+                    <div class="achievement-item locked" id="first-spark">
+                        <div class="achievement-icon">🔥</div>
+                        <p class="achievement-name">First spark</p>
+                        <p class="achievement-desc">Complete your first session</p>
+                    </div>
+                    
+                    <div class="achievement-item locked" id="7-day-streak">
+                        <div class="achievement-icon">📅</div>
+                        <p class="achievement-name">7-day streak</p>
+                        <p class="achievement-desc">Study 7 days in a row</p>
+                    </div>
+                    
+                    <div class="achievement-item locked" id="10-hours">
+                        <div class="achievement-icon">⏰</div>
+                        <p class="achievement-name">10 hours</p>
+                        <p class="achievement-desc">Log 10 total study hours</p>
+                    </div>
+                    
+                    <div class="achievement-item locked" id="night-owl">
+                        <div class="achievement-icon">🌙</div>
+                        <p class="achievement-name">Night owl</p>
+                        <p class="achievement-desc">Study after 10 PM</p>
+                    </div>
+                    
+                    <div class="achievement-item locked" id="early-bird">
+                        <div class="achievement-icon">🌅</div>
+                        <p class="achievement-name">Early bird</p>
+                        <p class="achievement-desc">Study before 7 AM</p>
+                    </div>
+                    
+                    <div class="achievement-item locked" id="50-sessions">
+                        <div class="achievement-icon">🏆</div>
+                        <p class="achievement-name">50 sessions</p>
+                        <p class="achievement-desc">Complete 50 sessions</p>
+                    </div>
+                    
+                    <div class="achievement-item locked" id="30-day-streak">
+                        <div class="achievement-icon">💪</div>
+                        <p class="achievement-name">30-day streak</p>
+                        <p class="achievement-desc">Study 30 days in a row</p>
+                    </div>
+                    
+                    <div class="achievement-item locked" id="100-hours">
+                        <div class="achievement-icon">📚</div>
+                        <p class="achievement-name">100 hours</p>
+                        <p class="achievement-desc">Log 100 total study hours</p>
+                    </div>
+                    
+                    <div class="achievement-item locked" id="deep-focus">
+                        <div class="achievement-icon">🎯</div>
+                        <p class="achievement-name">Deep focus</p>
+                        <p class="achievement-desc">Complete a 2 hour session</p>
+                    </div>
+                    
+                    <div class="achievement-item locked" id="marathon">
+                        <div class="achievement-icon">🌍</div>
+                        <p class="achievement-name">Marathon</p>
+                        <p class="achievement-desc">Study for 5 hours in one day</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+<script src="../js/greeting.js"></script>
+<script src="../js/achievements.js"></script>
+</body>
+</html>

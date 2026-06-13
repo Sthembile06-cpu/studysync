@@ -173,11 +173,56 @@ function switchMode() {
     }
 }
 
-// end session
 function endSession() {
     clearInterval(timerInterval);
     stopSound();
     releaseWakeLock();
+
+    // save session stats to localStorage
+    const sessions = parseInt(localStorage.getItem('totalSessions')) || 0;
+    localStorage.setItem('totalSessions', sessions + 1);
+
+    const hours = parseFloat(localStorage.getItem('totalHours')) || 0;
+    const sessionHours = (studyMinutes * totalCycles) / 60;
+    localStorage.setItem('totalHours', (hours + sessionHours).toFixed(1));
+
+    // today's hours for marathon achievement
+    const todayHours = parseFloat(localStorage.getItem('todayHours')) || 0;
+    localStorage.setItem('todayHours', (todayHours + sessionHours).toFixed(1));
+
+    // deep focus — check if session was 120 minutes or more
+    if (studyMinutes >= 120) {
+        localStorage.setItem('deepFocus', 'true');
+    }
+
+    // streak
+    const today = new Date().toDateString();
+    const lastStudy = localStorage.getItem('lastStudyDate');
+    let streak = parseInt(localStorage.getItem('streak')) || 0;
+
+    if (lastStudy === today) {
+        // already studied today — keep streak
+    } else if (lastStudy === new Date(Date.now() - 86400000).toDateString()) {
+        // studied yesterday — increment streak
+        streak++;
+    } else {
+        // missed a day — reset streak
+        streak = 1;
+    }
+
+    localStorage.setItem('streak', streak);
+    localStorage.setItem('lastStudyDate', today);
+    
+    const history = JSON.parse(localStorage.getItem('sessionHistory')) || [];
+    history.push({
+        date: new Date().toLocaleDateString(),
+        study: studyMinutes + ' min',
+        break: breakMinutes + ' min',
+        cycles: totalCycles
+    });
+    localStorage.setItem('sessionHistory', JSON.stringify(history));
+    console.log('History saved:', localStorage.getItem('sessionHistory'));
+
     alert('Session complete! Well done! 🎉');
     window.location.href = 'dashboard.html';
 }
