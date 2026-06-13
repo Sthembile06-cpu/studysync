@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - StudySync</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+    <nav class="dashboard-nav">
+        <div class="nav-brand">
+            <img src="../assets/images/StudySync1.png" alt="logo" class="hero-logo">
+        </div>
+        <div class="dashboard-nav-right">
+            <span class="welcome-text" id="welcome-name"></span>
+            <a href="login.html" class="nav-logout">Log Out</a>
+        </div>
+    </nav>
+
+    <div class="dashboard-body">
+        <aside class="sidebar">
+            <ul class="sidebar-links">
+                <li><a href="dashboard.html">🏠 Dashboard</a></li>
+                <li><a href="session.html">▶️ New Session</a></li>
+                <li><a href="statistics.html">📊 Statistics</a></li>
+                <li><a href="history.html">🕐 History</a></li>
+                <li><a href="achievements.html">⭐ Achievements</a></li>
+                <li class="active"><a href="settings.html">⚙️ Settings</a></li>
+                <li><a href="profile.html">👤 Profile</a></li>
+            </ul>
+        </aside>
+
+        <main class="dashboard-main">
+            <h2>Settings</h2>
+            <p class="section-subtext">Customise your StudySync experience</p>
+
+            <div class="dashboard-card">
+                <h3>Notifications</h3>
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <p class="setting-label">Session end alarm</p>
+                        <p class="setting-desc">Play alarm when study time ends</p>
+                    </div>
+                    <label class="toggle">
+                        <input type="checkbox" id="alarm-toggle" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <p class="setting-label">Break end reminder</p>
+                        <p class="setting-desc">Alert when break is over</p>
+                    </div>
+                    <label class="toggle">
+                        <input type="checkbox" id="break-toggle" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <p class="setting-label">Daily study reminder</p>
+                        <p class="setting-desc">Remind me to study if no session logged</p>
+                    </div>
+                    <label class="toggle">
+                        <input type="checkbox" id="reminder-toggle">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="dashboard-card">
+                <h3>Default session</h3>
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <p class="setting-label">Study duration</p>
+                        <p class="setting-desc">Default study time when starting a session</p>
+                    </div>
+                    <select id="default-study" class="setting-select">
+                        <option value="25">25 min</option>
+                        <option value="50">50 min</option>
+                        <option value="90">90 min</option>
+                        <option value="120">120 min</option>
+                    </select>
+                </div>
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <p class="setting-label">Break duration</p>
+                        <p class="setting-desc">Default break time between sessions</p>
+                    </div>
+                    <select id="default-break" class="setting-select">
+                        <option value="5">5 min</option>
+                        <option value="10">10 min</option>
+                        <option value="15">15 min</option>
+                        <option value="30">30 min</option>
+                    </select>
+                </div>
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <p class="setting-label">Default sound</p>
+                        <p class="setting-desc">Ambient sound played during focus sessions</p>
+                    </div>
+                    <select id="default-sound" class="setting-select">
+                        <option value="rain">🌧️ Rain</option>
+                        <option value="library">📚 Library</option>
+                        <option value="whitenoise">🌊 White noise</option>
+                        <option value="lofi">🎵 Lo-fi</option>
+                        <option value="none">🔇 None</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="dashboard-card">
+                <h3>Account</h3>
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <p class="setting-label">Clear all data</p>
+                        <p class="setting-desc">Reset all your stats, history and achievements</p>
+                    </div>
+                    <button type="button" id="clear-data-btn" class="danger-btn">Clear data</button>
+                </div>
+            </div>
+
+            <button type="button" id="save-settings-btn" class="auth-btn" style="margin-top: 20px;">Save settings</button>
+        </main>
+    </div>
+
+<script src="../js/greeting.js"></script>
+<script src="../js/settings.js"></script>
+</body>
+</html>
