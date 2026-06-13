@@ -218,7 +218,8 @@ function endSession() {
         date: new Date().toLocaleDateString(),
         study: studyMinutes + ' min',
         break: breakMinutes + ' min',
-        cycles: totalCycles
+        cycles: totalCycles ,
+        sound: sound
     });
     localStorage.setItem('sessionHistory', JSON.stringify(history));
     console.log('History saved:', localStorage.getItem('sessionHistory'));
