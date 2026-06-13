@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile - StudySync</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+    <nav class="dashboard-nav">
+        <div class="nav-brand">
+            <img src="../assets/images/StudySync1.png" alt="logo" class="hero-logo">
+        </div>
+        <div class="dashboard-nav-right">
+            <span class="welcome-text" id="welcome-name"></span>
+            <a href="login.html" class="nav-logout">Log Out</a>
+        </div>
+    </nav>
+
+    <div class="dashboard-body">
+        <aside class="sidebar">
+            <ul class="sidebar-links">
+                <li><a href="dashboard.html">🏠 Dashboard</a></li>
+                <li><a href="session.html">▶️ New Session</a></li>
+                <li><a href="statistics.html">📊 Statistics</a></li>
+                <li><a href="history.html">🕐 History</a></li>
+                <li><a href="achievements.html">⭐ Achievements</a></li>
+                <li><a href="settings.html">⚙️ Settings</a></li>
+                <li class="active"><a href="profile.html">👤 Profile</a></li>
+            </ul>
+        </aside>
+
+        <main class="dashboard-main">
+            <h2>Profile</h2>
+            <p class="section-subtext">Your StudySync account</p>
+
+            <!-- AVATAR & NAME -->
+            <div class="dashboard-card">
+                <div class="profile-header">
+                    <div class="profile-avatar" id="profile-avatar">S</div>
+                    <div class="profile-info">
+                        <h3 id="profile-name">Student</h3>
+                        <p id="profile-email" class="section-subtext">No email set</p>
+                        <p class="profile-member">Member since 2026</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- STATS SUMMARY -->
+            <div class="dashboard-card">
+                <h3>Your stats</h3>
+                <div class="stats-row" style="margin-top: 15px;">
+                    <div class="stat-box">
+                        <h3 id="profile-sessions">0</h3>
+                        <p>Sessions done</p>
+                    </div>
+                    <div class="stat-box">
+                        <h3 id="profile-hours">0h</h3>
+                        <p>Total hours</p>
+                    </div>
+                    <div class="stat-box">
+                        <h3 id="profile-streak">0</h3>
+                        <p>Best streak 🔥</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- EDIT PROFILE -->
+            <div class="dashboard-card">
+                <h3>Edit profile</h3>
+                <div class="form-group">
+                    <label class="form-label">Display name</label>
+                    <input type="text" id="edit-name" placeholder="Enter your name">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email</label>
+                    <input type="email" id="edit-email" placeholder="Enter your email">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Daily study goal</label>
+                    <select id="study-goal" class="setting-select" style="width:100%; padding: 12px;">
+                        <option value="1">1 hour per day</option>
+                        <option value="2">2 hours per day</option>
+                        <option value="3">3 hours per day</option>
+                        <option value="4">4 hours per day</option>
+                        <option value="5">5 hours per day</option>
+                    </select>
+                </div>
+                <button type="button" id="save-profile-btn" class="auth-btn" style="margin-top: 10px;">Save profile</button>
+            </div>
+
+            <!-- TOP ACHIEVEMENTS -->
+            <div class="dashboard-card">
+                <h3>Top achievements</h3>
+                <div id="profile-achievements" class="profile-achievements">
+                    <p class="section-subtext">No achievements yet. Complete sessions to earn badges!</p>
+                </div>
+            </div>
+
+            <!-- LOG OUT -->
+            <button type="button" id="logout-btn" class="danger-btn" style="width:100%; margin-top: 20px; padding: 14px;">Log Out</button>
+
+        </main>
+    </div>
+
+<script src="../js/greeting.js"></script>
+<script src="../js/profile.js"></script>
+</body>
+</html>
