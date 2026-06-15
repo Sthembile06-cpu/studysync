@@ -1252,6 +1252,69 @@ nav {
     color: #e2e8f0;
 }
 
+#coming-soon {
+    text-align: center;
+    padding: 60px 40px;
+    background: #0f172a;
+}
+
+#coming-soon h2 {
+    font-size: 36px;
+    margin-bottom: 10px;
+}
+
+.coming-soon-card {
+    position: relative;
+    border: 1px solid #334155;
+    opacity: 0.85;
+    transition: transform 0.3s;
+}
+
+.coming-soon-card:hover {
+    transform: translateY(-5px);
+    opacity: 1;
+}
+
+.coming-soon-badge {
+    display: inline-block;
+    background: #C9922A;
+    color: white;
+    font-size: 11px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    margin-bottom: 12px;
+    font-weight: bold;
+    letter-spacing: 1px;
+}
+
+.sidebar-coming-soon {
+    margin-top: 30px;
+    padding: 15px;
+    background: #0f172a;
+    border-radius: 10px;
+    border: 1px dashed #334155;
+}
+
+.sidebar-coming-soon-title {
+    font-size: 11px;
+    color: #C9922A;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    font-weight: bold;
+}
+
+.sidebar-coming-soon ul {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.sidebar-coming-soon ul li {
+    font-size: 12px;
+    color: #475569;
+}
 /* Mobile (480px and below) */
 @media (max-width: 480px) {
 
