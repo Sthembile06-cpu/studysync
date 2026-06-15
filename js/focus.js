@@ -30,6 +30,23 @@ async function releaseWakeLock() {
     }
 }
 
+// request notification permission
+async function requestNotificationPermission() {
+    if ('Notification' in window) {
+        const permission = await Notification.requestPermission();
+        console.log('Notification permission:', permission);
+    }
+}
+
+function sendNotification(title, body) {
+    if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification(title, {
+            body: body,
+            icon: '../assets/images/StudySync1.png'
+        });
+    }
+}
+
 // unlock audio on first user interaction
 let audioUnlocked = false;
 
@@ -127,7 +144,7 @@ function updateCycleDisplay() {
 
 function playAlarm() {
     const alarmOn = localStorage.getItem('alarmOn') !== 'false';
-    if (!alarmOn) return; // don't play if turned off
+    if (!alarmOn) return;
 
     const alarmSound = new Audio('../assets/sounds/alarm.mp3');
     alarmSound.volume = 1.0;
@@ -143,6 +160,7 @@ function switchMode() {
         isStudying = false;
         timeLeft = breakMinutes * 60;
         totalTime = breakMinutes * 60;
+        sendNotification('Break time! ☕', 'Great work! Take a well deserved break.');
 
         document.getElementById('focus-mode-label').textContent = 'BREAK TIME ☕';
         document.body.style.background = '#0a1a0a';
@@ -154,6 +172,7 @@ function switchMode() {
 
     } else {
         currentCycle++;
+        sendNotification('Back to focus! 📚', 'Break is over. Let\'s get back to work!');
 
         if (currentCycle > totalCycles) {
             endSession();
@@ -180,7 +199,6 @@ function endSession() {
     stopSound();
     releaseWakeLock();
 
-    // save session stats to localStorage
     const sessions = parseInt(localStorage.getItem('totalSessions')) || 0;
     localStorage.setItem('totalSessions', sessions + 1);
 
@@ -188,34 +206,28 @@ function endSession() {
     const sessionHours = (studyMinutes * totalCycles) / 60;
     localStorage.setItem('totalHours', (hours + sessionHours).toFixed(1));
 
-    // today's hours for marathon achievement
     const todayHours = parseFloat(localStorage.getItem('todayHours')) || 0;
     localStorage.setItem('todayHours', (todayHours + sessionHours).toFixed(1));
 
-    // deep focus — check if session was 120 minutes or more
     if (studyMinutes >= 120) {
         localStorage.setItem('deepFocus', 'true');
     }
 
-    // streak
     const today = new Date().toDateString();
     const lastStudy = localStorage.getItem('lastStudyDate');
     let streak = parseInt(localStorage.getItem('streak')) || 0;
 
     if (lastStudy === today) {
-        // already studied today — keep streak
+        // already studied today
     } else if (lastStudy === new Date(Date.now() - 86400000).toDateString()) {
-        // studied yesterday — increment streak
         streak++;
     } else {
-        // missed a day — reset streak
         streak = 1;
     }
 
     localStorage.setItem('streak', streak);
     localStorage.setItem('lastStudyDate', today);
-    
-    // save to localStorage for offline use
+
     const history = JSON.parse(localStorage.getItem('sessionHistory')) || [];
     history.push({
         date: new Date().toLocaleDateString(),
@@ -225,7 +237,7 @@ function endSession() {
         sound: sound
     });
     localStorage.setItem('sessionHistory', JSON.stringify(history));
-    
+
     const token = localStorage.getItem('token');
     if (token) {
         fetch('http://localhost:5000/api/sessions', {
@@ -245,8 +257,8 @@ function endSession() {
         .then(data => console.log('Session saved to database:', data))
         .catch(err => console.error('Failed to save session:', err));
     }
-    console.log('History saved:', localStorage.getItem('sessionHistory'));
 
+    sendNotification('Session complete! 🎉', 'Amazing work! You completed your study session.');
     alert('Session complete! Well done! 🎉');
     window.location.href = 'dashboard.html';
 }
@@ -312,10 +324,20 @@ document.querySelector('.focus-exit-btn').addEventListener('click', function() {
     }
 });
 
-// initialise
+// DND reminder — timer only starts after clicking Got it
+document.getElementById('dnd-ok-btn').addEventListener('click', function() {
+    document.getElementById('dnd-reminder').style.display = 'none';
+    // start everything after dismissing DND reminder
+    setQuote();
+    updateCycleDisplay();
+    document.getElementById('timer-display').textContent = formatTime(timeLeft);
+    playSound();
+    startTimer();
+    requestWakeLock();
+    requestNotificationPermission();
+});
+
+// initialise display only — timer starts after DND dismissed
 setQuote();
 updateCycleDisplay();
 document.getElementById('timer-display').textContent = formatTime(timeLeft);
-playSound();
-startTimer();
-requestWakeLock();
