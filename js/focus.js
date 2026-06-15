@@ -215,15 +215,36 @@ function endSession() {
     localStorage.setItem('streak', streak);
     localStorage.setItem('lastStudyDate', today);
     
+    // save to localStorage for offline use
     const history = JSON.parse(localStorage.getItem('sessionHistory')) || [];
     history.push({
         date: new Date().toLocaleDateString(),
         study: studyMinutes + ' min',
         break: breakMinutes + ' min',
-        cycles: totalCycles ,
+        cycles: totalCycles,
         sound: sound
     });
     localStorage.setItem('sessionHistory', JSON.stringify(history));
+    
+    const token = localStorage.getItem('token');
+    if (token) {
+        fetch('http://localhost:5000/api/sessions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + token
+            },
+            body: JSON.stringify({
+                study_minutes: studyMinutes,
+                break_minutes: breakMinutes,
+                cycles: totalCycles,
+                sound: sound
+            })
+        })
+        .then(res => res.json())
+        .then(data => console.log('Session saved to database:', data))
+        .catch(err => console.error('Failed to save session:', err));
+    }
     console.log('History saved:', localStorage.getItem('sessionHistory'));
 
     alert('Session complete! Well done! 🎉');
