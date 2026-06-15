@@ -1,33 +1,45 @@
-function loadStatistics() {
-    const sessions = parseInt(localStorage.getItem('totalSessions')) || 0;
-    const hours = parseFloat(localStorage.getItem('totalHours')) || 0;
-    const streak = parseInt(localStorage.getItem('streak')) || 0;
-    const history = JSON.parse(localStorage.getItem('sessionHistory')) || [];
+async function loadStatistics() {
+    const token = localStorage.getItem('token');
 
-    // update stat boxes
-    document.getElementById('total-hours').textContent = hours + 'h';
-    document.getElementById('total-sessions').textContent = sessions;
-    document.getElementById('current-streak').textContent = streak;
-    document.getElementById('longest-streak').textContent = streak;
+    try {
+        const response = await fetch('http://localhost:5000/api/sessions', {
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
 
-    loadWeeklyChart(history);
-    loadInsights(history);
+        const sessions = await response.json();
+
+        // calculate stats
+        const totalSessions = sessions.length;
+        const totalMinutes = sessions.reduce((sum, s) => sum + (s.study_minutes * s.cycles), 0);
+        const totalHours = (totalMinutes / 60).toFixed(1);
+        const streak = parseInt(localStorage.getItem('streak')) || 0;
+
+        // update stat boxes
+        document.getElementById('total-hours').textContent = totalHours + 'h';
+        document.getElementById('total-sessions').textContent = totalSessions;
+        document.getElementById('current-streak').textContent = streak;
+        document.getElementById('longest-streak').textContent = streak;
+
+        loadWeeklyChart(sessions);
+        loadInsights(sessions);
+
+    } catch (error) {
+        console.error('Failed to load statistics:', error);
+    }
 }
 
-function loadWeeklyChart(history) {
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+function loadWeeklyChart(sessions) {
     const now = new Date();
     const weekData = [0, 0, 0, 0, 0, 0, 0];
 
-    history.forEach(session => {
-        const date = new Date(session.date);
+    sessions.forEach(session => {
+        const date = new Date(session.completed_at);
         const dayDiff = Math.floor((now - date) / (1000 * 60 * 60 * 24));
 
         if (dayDiff < 7) {
             let dayIndex = date.getDay() - 1;
             if (dayIndex < 0) dayIndex = 6;
-            const minutes = parseInt(session.study) || 0;
-            weekData[dayIndex] += minutes;
+            weekData[dayIndex] += session.study_minutes;
         }
     });
 
@@ -35,21 +47,27 @@ function loadWeeklyChart(history) {
     const bars = document.querySelectorAll('.week-bar');
 
     bars.forEach((bar, index) => {
-        const height = (weekData[index] / maxMinutes) * 100;
-        bar.style.height = height + '%';
-        bar.title = weekData[index] + ' min';
+        if (weekData[index] > 0) {
+            const height = (weekData[index] / maxMinutes) * 100;
+            bar.style.height = height + '%';
+            bar.title = weekData[index] + ' min studied';
+            bar.style.opacity = '1';
+        } else {
+            bar.style.height = '4px';
+            bar.style.opacity = '0.2';
+        }
     });
 }
 
-function loadInsights(history) {
-    if (history.length === 0) return;
+function loadInsights(sessions) {
+    if (sessions.length === 0) return;
 
     // best study day
     const dayCounts = [0, 0, 0, 0, 0, 0, 0];
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-    history.forEach(session => {
-        const date = new Date(session.date);
+    sessions.forEach(session => {
+        const date = new Date(session.completed_at);
         dayCounts[date.getDay()]++;
     });
 
@@ -57,13 +75,13 @@ function loadInsights(history) {
     document.getElementById('best-day').textContent = dayNames[bestDayIndex];
 
     // average session length
-    const totalMinutes = history.reduce((sum, s) => sum + (parseInt(s.study) || 0), 0);
-    const avg = Math.round(totalMinutes / history.length);
+    const totalMinutes = sessions.reduce((sum, s) => sum + s.study_minutes, 0);
+    const avg = Math.round(totalMinutes / sessions.length);
     document.getElementById('avg-session').textContent = avg + ' min';
 
     // favourite sound
     const soundCounts = {};
-    history.forEach(session => {
+    sessions.forEach(session => {
         if (session.sound) {
             soundCounts[session.sound] = (soundCounts[session.sound] || 0) + 1;
         }
@@ -77,8 +95,8 @@ function loadInsights(history) {
 
     // most productive time
     const hourCounts = {};
-    history.forEach(session => {
-        const date = new Date(session.date);
+    sessions.forEach(session => {
+        const date = new Date(session.completed_at);
         const hour = date.getHours();
         let timeLabel = '';
         if (hour >= 5 && hour < 12) timeLabel = 'Morning';

@@ -1,22 +1,45 @@
-function loadProfile() {
-    const name = localStorage.getItem('profileName') || 'Student';
-    const email = localStorage.getItem('profileEmail') || 'No email set';
-    const goal = localStorage.getItem('studyGoal') || '2';
-    const sessions = parseInt(localStorage.getItem('totalSessions')) || 0;
-    const hours = parseFloat(localStorage.getItem('totalHours')) || 0;
-    const streak = parseInt(localStorage.getItem('streak')) || 0;
+async function loadProfile() {
+    const token = localStorage.getItem('token');
+    const localUser = JSON.parse(localStorage.getItem('user'));
 
-    document.getElementById('profile-name').textContent = name;
-    document.getElementById('profile-email').textContent = email;
-    document.getElementById('profile-avatar').textContent = name.charAt(0).toUpperCase();
-    document.getElementById('edit-name').value = name !== 'Student' ? name : '';
-    document.getElementById('edit-email').value = email !== 'No email set' ? email : '';
-    document.getElementById('study-goal').value = goal;
-    document.getElementById('profile-sessions').textContent = sessions;
-    document.getElementById('profile-hours').textContent = hours + 'h';
-    document.getElementById('profile-streak').textContent = streak;
+    try {
+        const response = await fetch('http://localhost:5000/api/users/profile', {
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
 
-    loadProfileAchievements();
+        const user = await response.json();
+
+        document.getElementById('profile-name').textContent = user.name;
+        document.getElementById('profile-email').textContent = user.email;
+        document.getElementById('profile-avatar').textContent = user.name.charAt(0).toUpperCase();
+        document.getElementById('edit-name').value = user.name;
+        document.getElementById('edit-email').value = user.email;
+
+        // load stats from sessions
+        const sessionsResponse = await fetch('http://localhost:5000/api/sessions/stats', {
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
+
+        const stats = await sessionsResponse.json();
+        const totalMinutes = stats.total_minutes || 0;
+        const totalSessions = stats.total_sessions || 0;
+        const streak = parseInt(localStorage.getItem('streak')) || 0;
+
+        document.getElementById('profile-sessions').textContent = totalSessions;
+        document.getElementById('profile-hours').textContent = totalMinutes < 60
+            ? totalMinutes + 'm'
+            : (totalMinutes / 60).toFixed(1) + 'h';
+        document.getElementById('profile-streak').textContent = streak;
+
+        // member since
+        const memberSince = new Date(user.created_at).getFullYear();
+        document.querySelector('.profile-member').textContent = 'Member since ' + memberSince;
+
+        loadProfileAchievements();
+
+    } catch (error) {
+        console.error('Failed to load profile:', error);
+    }
 }
 
 function loadProfileAchievements() {
@@ -52,17 +75,38 @@ function loadProfileAchievements() {
     `).join('');
 }
 
-document.getElementById('save-profile-btn').addEventListener('click', function() {
+document.getElementById('save-profile-btn').addEventListener('click', async function() {
+    const token = localStorage.getItem('token');
     const name = document.getElementById('edit-name').value.trim();
-    const email = document.getElementById('edit-email').value.trim();
-    const goal = document.getElementById('study-goal').value;
 
-    if (name) localStorage.setItem('profileName', name);
-    if (email) localStorage.setItem('profileEmail', email);
-    localStorage.setItem('studyGoal', goal);
+    if (!name) {
+        alert('Name cannot be empty');
+        return;
+    }
 
-    loadProfile();
-    alert('Profile saved!');
+    try {
+        const response = await fetch('http://localhost:5000/api/users/profile', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + token
+            },
+            body: JSON.stringify({ name })
+        });
+
+        if (response.ok) {
+            // update localStorage user
+            const user = JSON.parse(localStorage.getItem('user'));
+            user.name = name;
+            localStorage.setItem('user', JSON.stringify(user));
+            loadProfile();
+            alert('Profile saved!');
+        }
+
+    } catch (error) {
+        console.error('Failed to save profile:', error);
+        alert('Failed to save profile');
+    }
 });
 
 document.getElementById('logout-btn').addEventListener('click', function() {
