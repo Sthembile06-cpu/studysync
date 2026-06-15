@@ -1,35 +1,64 @@
-function loadDashboardStats() {
-    const sessions = parseInt(localStorage.getItem('totalSessions')) || 0;
-    const hours = parseFloat(localStorage.getItem('totalHours')) || 0;
-    const streak = parseInt(localStorage.getItem('streak')) || 0;
+async function loadDashboardStats() {
+    const token = localStorage.getItem('token');
 
-    document.getElementById('sessions-count').textContent = sessions;
-    document.getElementById('hours-count').textContent = hours < 1 
-        ? Math.round(hours * 60) + 'm' 
-        : hours + 'h';
-    document.getElementById('streak-count').textContent = streak;
+    try {
+        const response = await fetch('http://localhost:5000/api/sessions/stats', {
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
+
+        const data = await response.json();
+
+        const totalMinutes = data.total_minutes || 0;
+        const totalSessions = data.total_sessions || 0;
+        const streak = parseInt(localStorage.getItem('streak')) || 0;
+
+        document.getElementById('sessions-count').textContent = totalSessions;
+        document.getElementById('hours-count').textContent = totalMinutes < 60
+            ? totalMinutes + 'm'
+            : (totalMinutes / 60).toFixed(1) + 'h';
+        document.getElementById('streak-count').textContent = streak;
+
+    } catch (error) {
+        console.error('Failed to load stats:', error);
+    }
 }
 
-function loadRecentSessions() {
+async function loadRecentSessions() {
+    const token = localStorage.getItem('token');
     const recentDiv = document.getElementById('recent-sessions');
-    const history = JSON.parse(localStorage.getItem('sessionHistory')) || [];
 
-    if (history.length === 0) {
-        recentDiv.innerHTML = '<p class="section-subtext">No sessions yet. Start your first session!</p>';
-        return;
+    try {
+        const response = await fetch('http://localhost:5000/api/sessions', {
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
+
+        const sessions = await response.json();
+
+        if (sessions.length === 0) {
+            recentDiv.innerHTML = '<p class="section-subtext">No sessions yet. Start your first session!</p>';
+            return;
+        }
+
+        let html = '';
+        sessions.slice(0, 5).forEach(session => {
+            const date = new Date(session.completed_at).toLocaleDateString();
+            html += `
+                <div class="session-item">
+                    <div>
+                        <p style="color:#e2e8f0; font-size:14px;">${date} · ${session.study_minutes} min study / ${session.break_minutes} min break</p>
+                        <p style="color:#94a3b8; font-size:12px;">${session.cycles} cycle(s)</p>
+                    </div>
+                    <span class="badge-done">Done</span>
+                </div>
+            `;
+        });
+
+        recentDiv.innerHTML = html;
+
+    } catch (error) {
+        console.error('Failed to load sessions:', error);
+        recentDiv.innerHTML = '<p class="section-subtext">Failed to load sessions.</p>';
     }
-
-    let html = '';
-    history.slice(-5).reverse().forEach(session => {
-        html += `
-            <div class="session-item">
-                <span>${session.date} · ${session.study} study / ${session.break} break · ${session.cycles} cycle(s)</span>
-                <span class="badge-done">Done</span>
-            </div>
-        `;
-    });
-
-    recentDiv.innerHTML = html;
 }
 
 loadDashboardStats();
