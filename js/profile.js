@@ -67,6 +67,8 @@ document.getElementById('save-profile-btn').addEventListener('click', function()
 
 document.getElementById('logout-btn').addEventListener('click', function() {
     if (confirm('Are you sure you want to log out?')) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
         window.location.href = 'login.html';
     }
 });
