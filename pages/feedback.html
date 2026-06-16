@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feedback - StudySync</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+</head>
+<body>
+    <nav class="dashboard-nav">
+        <div class="nav-brand">
+            <img src="../assets/images/StudySync1.png" alt="logo" class="hero-logo">
+        </div>
+        <div class="dashboard-nav-right">
+            <span class="welcome-text" id="welcome-name"></span>
+            <a href="#" onclick="logout()" class="nav-logout">Log Out</a>
+        </div>
+    </nav>
+
+    <div class="dashboard-body">
+        <aside class="sidebar">
+            <ul class="sidebar-links">
+                <li><a href="dashboard.html">🏠 Dashboard</a></li>
+                <li><a href="session.html">▶️ New Session</a></li>
+                <li><a href="statistics.html">📊 Statistics</a></li>
+                <li><a href="history.html">🕐 History</a></li>
+                <li><a href="achievements.html">⭐ Achievements</a></li>
+                <li><a href="settings.html">⚙️ Settings</a></li>
+                <li><a href="profile.html">👤 Profile</a></li>
+                <li class="active"><a href="feedback.html">💬 Feedback</a></li>
+            </ul>
+
+            <div class="sidebar-coming-soon">
+                <p class="sidebar-coming-soon-title">Coming soon</p>
+                <ul>
+                    <li>👥 Study rooms</li>
+                    <li>📱 Mobile app</li>
+                    <li>📊 Advanced analytics</li>
+                    <li>🎯 Goals & challenges</li>
+                </ul>
+            </div>
+        </aside>
+
+        <main class="dashboard-main">
+            <h2>Feedback</h2>
+            <p class="section-subtext">Help us improve StudySync — your feedback matters!</p>
+
+            <!-- RATING -->
+            <div class="dashboard-card">
+                <h3>How would you rate StudySync?</h3>
+                <div class="star-rating">
+                    <span class="star" data-value="1">⭐</span>
+                    <span class="star" data-value="2">⭐</span>
+                    <span class="star" data-value="3">⭐</span>
+                    <span class="star" data-value="4">⭐</span>
+                    <span class="star" data-value="5">⭐</span>
+                </div>
+                <p class="rating-label" id="rating-label">Click to rate</p>
+            </div>
+
+            <!-- FEEDBACK FORM -->
+            <div class="dashboard-card">
+                <h3>Share your thoughts</h3>
+
+                <div class="form-group">
+                    <label class="form-label">Category</label>
+                    <select id="feedback-category" class="setting-select" style="width:100%; padding:12px;">
+                        <option value="general">💬 General feedback</option>
+                        <option value="bug">🐛 Bug report</option>
+                        <option value="suggestion">💡 Suggestion</option>
+                        <option value="feature">🚀 Feature request</option>
+                        <option value="compliment">❤️ Compliment</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Your message</label>
+                    <textarea id="feedback-message" placeholder="Tell us what you think, what's broken, or what you'd love to see..." rows="5" style="padding:12px; border-radius:8px; border:1px solid #334155; background:#0f172a; color:#e2e8f0; font-size:14px; width:100%; resize:vertical;"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Your email (optional — if you want a reply)</label>
+                    <input type="email" id="feedback-email" placeholder="your@email.com">
+                </div>
+
+                <button type="button" id="submit-feedback-btn" class="auth-btn" style="margin-top:10px;">
+                    Send Feedback
+                </button>
+
+                <div id="feedback-success" style="display:none; margin-top:15px; padding:15px; background:#1e293b; border-radius:8px; border-left:4px solid #378ADD;">
+                    <p style="color:#e2e8f0;">✅ Thank you for your feedback! We really appreciate it.</p>
+                </div>
+            </div>
+
+            <!-- PREVIOUS FEEDBACK -->
+            <div class="dashboard-card">
+                <h3>Your previous feedback</h3>
+                <div id="previous-feedback">
+                    <p class="section-subtext">No feedback submitted yet.</p>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+<script src="../js/protect.js"></script>
+<script src="../js/feedback.js"></script>
+</body>
+</html>

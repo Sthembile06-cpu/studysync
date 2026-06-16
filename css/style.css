@@ -265,7 +265,7 @@ nav {
 #cta{
     text-align: center;
     padding: 80px 40px;
-    background: #0a0f1e;
+    background: #0f172a;
 }
 
 #cta h2{
@@ -296,9 +296,10 @@ nav {
 }
 
 .footer{
-    background: #0f172a;
+    background: #0a0f1e;
     padding: 60px 40px;
     color: #94a3b8;
+    margin: 1px;
 }
 .footer-top{
     display: flex;
@@ -1255,7 +1256,7 @@ nav {
 #coming-soon {
     text-align: center;
     padding: 60px 40px;
-    background: #0f172a;
+    background: #0a0f1e;
 }
 
 #coming-soon h2 {
@@ -1366,4 +1367,28 @@ nav {
         width: 100%;
         text-align: center;
     }
+}
+
+.star-rating {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+    margin-bottom: 10px;
+}
+
+.star {
+    font-size: 32px;
+    cursor: pointer;
+    opacity: 0.3;
+    transition: opacity 0.2s;
+}
+
+.star.active {
+    opacity: 1;
+}
+
+.rating-label {
+    font-size: 13px;
+    color: #94a3b8;
+    margin-top: 5px;
 }
