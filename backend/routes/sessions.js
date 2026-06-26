@@ -61,4 +61,20 @@ router.get('/stats', authMiddleware, async (req, res) => {
     }
 });
 
+router.delete('/', authMiddleware, async (req, res) => {
+    try {
+        const user_id = req.user.id;
+
+        await db.execute(
+            'DELETE FROM sessions WHERE user_id = ?',
+            [user_id]
+        );
+
+        res.json({ message: 'All sessions deleted successfully' });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
 module.exports = router;

@@ -28,11 +28,45 @@ document.getElementById('save-settings-btn').addEventListener('click', function(
 });
 
 // clear all data
-document.getElementById('clear-data-btn').addEventListener('click', function() {
-    if (confirm('Are you sure? This will delete all your stats, history and achievements.')) {
-        localStorage.clear();
-        alert('All data cleared!');
+document.getElementById('clear-data-btn').addEventListener('click', async function() {
+    if (!confirm('Are you sure? This will permanently delete all your stats, history and achievements. This cannot be undone.')) {
+        return;
+    }
+
+    const token = localStorage.getItem('token');
+
+    try {
+        const response = await fetch('https://studysync-backend-we5u.onrender.com/api/sessions', {
+            method: 'DELETE',
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to delete sessions from server');
+        }
+
+        // clear local copies (achievements, old session history, streak, preferences)
+        localStorage.removeItem('sessionHistory');
+        localStorage.removeItem('totalSessions');
+        localStorage.removeItem('totalHours');
+        localStorage.removeItem('todayHours');
+        localStorage.removeItem('streak');
+        localStorage.removeItem('lastStudyDate');
+        localStorage.removeItem('deepFocus');
+
+        // clear achievement flags
+        const achievementIds = [
+            'first-spark', '7-day-streak', '10-hours', 'night-owl', 'early-bird',
+            '50-sessions', '30-day-streak', '100-hours', 'deep-focus', 'marathon'
+        ];
+        achievementIds.forEach(id => localStorage.removeItem('achievement-' + id));
+
+        alert('All your data has been cleared.');
         window.location.href = 'dashboard.html';
+
+    } catch (error) {
+        console.error('Clear data error:', error);
+        alert('Something went wrong while clearing your data. Please try again.');
     }
 });
 
