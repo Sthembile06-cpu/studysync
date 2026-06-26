@@ -240,7 +240,7 @@ function endSession() {
 
     const token = localStorage.getItem('token');
     if (token) {
-        fetch('http://localhost:5000/api/sessions', {
+        fetch('https://studysync-backend-we5u.onrender.com/api/sessions', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

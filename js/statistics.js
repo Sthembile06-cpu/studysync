@@ -2,7 +2,7 @@ async function loadStatistics() {
     const token = localStorage.getItem('token');
 
     try {
-        const response = await fetch('http://localhost:5000/api/sessions', {
+        const response = await fetch('https://studysync-backend-we5u.onrender.com/api/sessions', {
             headers: { 'Authorization': 'Bearer ' + token }
         });
 

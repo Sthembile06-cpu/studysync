@@ -3,7 +3,7 @@ async function loadProfile() {
     const localUser = JSON.parse(localStorage.getItem('user'));
 
     try {
-        const response = await fetch('http://localhost:5000/api/users/profile', {
+        const response = await fetch('https://studysync-backend-we5u.onrender.com/api/users/profile', {
             headers: { 'Authorization': 'Bearer ' + token }
         });
 
@@ -16,7 +16,7 @@ async function loadProfile() {
         document.getElementById('edit-email').value = user.email;
 
         // load stats from sessions
-        const sessionsResponse = await fetch('http://localhost:5000/api/sessions/stats', {
+        const sessionsResponse = await fetch('https://studysync-backend-we5u.onrender.com/api/sessions/stats', {
             headers: { 'Authorization': 'Bearer ' + token }
         });
 
@@ -85,7 +85,7 @@ document.getElementById('save-profile-btn').addEventListener('click', async func
     }
 
     try {
-        const response = await fetch('http://localhost:5000/api/users/profile', {
+        const response = await fetch('https://studysync-backend-we5u.onrender.com/api/users/profile', {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
