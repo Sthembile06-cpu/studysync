@@ -1,4 +1,4 @@
-const API_URL = 'https://studysync-backend-we5u.onrender.com';
+const API_URL = 'https://studysync-backend-we5u.onrender.com/api';
 
 function showSignup() {
     document.getElementById('login-form').style.display = 'none';
