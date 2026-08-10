@@ -17,6 +17,14 @@ const pool = mysql.createPool({
 
 pool.on('error', (err) => {
     console.error('Unexpected MySQL pool error:', err.code);
+    // Don't crash — mysql2 will open a fresh connection on the next query
 });
+
+// Ping the pool periodically to keep at least one connection alive
+setInterval(() => {
+    pool.query('SELECT 1').catch(err => 
+        console.error('Keepalive ping failed:', err.code)
+    );
+}, 60000); // every 60 seconds
 
 module.exports = pool;
