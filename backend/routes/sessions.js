@@ -61,6 +61,7 @@ router.get('/stats', authMiddleware, async (req, res) => {
     }
 });
 
+// DELETE ALL SESSIONS
 router.delete('/', authMiddleware, async (req, res) => {
     try {
         const user_id = req.user.id;
@@ -77,4 +78,5 @@ router.delete('/', authMiddleware, async (req, res) => {
         res.status(500).json({ message: 'Server error' });
     }
 });
+
 module.exports = router;
