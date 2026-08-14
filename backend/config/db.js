@@ -14,7 +14,7 @@ const pool = mysql.createPool({
     enableKeepAlive: true,
     keepAliveInitialDelay: 10000,
     ssl: {
-        rejectUnauthorized: true
+        rejectUnauthorized: false
     }
 });
 
