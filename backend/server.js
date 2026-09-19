@@ -3,38 +3,64 @@ const cors = require('cors');
 require('dotenv').config();
 const db = require('./config/db');
 
-// test database connection
-db.execute('SELECT 1')
-    .then(() => console.log('Database connected successfully!'))
-    .catch(err => console.error('Database connection error:', err.message));
-console.log('Starting server...');
-
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-console.log('Loading auth routes...');
-const authRoutes = require('./routes/auth');
-console.log('Auth routes type:', typeof authRoutes);
+// initialize database tables
+async function initializeDatabase() {
+    try {
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                email VARCHAR(100) NOT NULL UNIQUE,
+                password VARCHAR(255) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
 
-console.log('Loading session routes...');
-const sessionRoutes = require('./routes/sessions');
-console.log('Session routes type:', typeof sessionRoutes);
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS sessions (
+                id SERIAL PRIMARY KEY,
+                user_id INT NOT NULL,
+                study_minutes INT NOT NULL,
+                break_minutes INT NOT NULL,
+                cycles INT NOT NULL,
+                sound VARCHAR(50),
+                completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        `);
 
-console.log('Loading user routes...');
-const userRoutes = require('./routes/users');
-console.log('User routes type:', typeof userRoutes);
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS achievements (
+                id SERIAL PRIMARY KEY,
+                user_id INT NOT NULL,
+                achievement_id VARCHAR(50) NOT NULL,
+                unlocked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        `);
 
-app.use('/api/auth', authRoutes);
-app.use('/api/sessions', sessionRoutes);
-app.use('/api/users', userRoutes);
+        console.log('Database tables ready');
+    } catch (error) {
+        console.error('Database initialization error:', error.message);
+    }
+}
+
+// routes
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/sessions', require('./routes/sessions'));
+app.use('/api/users', require('./routes/users'));
 
 app.get('/', (req, res) => {
     res.json({ message: 'StudySync API is running!' });
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
     console.log(`Server running on port ${PORT}`);
+    await initializeDatabase();
 });
