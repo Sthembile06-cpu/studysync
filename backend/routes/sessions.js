@@ -9,8 +9,8 @@ router.post('/', authMiddleware, async (req, res) => {
         const { study_minutes, break_minutes, cycles, sound } = req.body;
         const user_id = req.user.id;
 
-        await db.execute(
-            'INSERT INTO sessions (user_id, study_minutes, break_minutes, cycles, sound) VALUES (?, ?, ?, ?, ?)',
+        await db.query(
+            'INSERT INTO sessions (user_id, study_minutes, break_minutes, cycles, sound) VALUES ($1, $2, $3, $4, $5)',
             [user_id, study_minutes, break_minutes, cycles, sound]
         );
 
@@ -27,12 +27,12 @@ router.get('/', authMiddleware, async (req, res) => {
     try {
         const user_id = req.user.id;
 
-        const [sessions] = await db.execute(
-            'SELECT * FROM sessions WHERE user_id = ? ORDER BY completed_at DESC',
+        const result = await db.query(
+            'SELECT * FROM sessions WHERE user_id = $1 ORDER BY completed_at DESC',
             [user_id]
         );
 
-        res.json(sessions);
+        res.json(result.rows);
 
     } catch (error) {
         console.error(error);
@@ -45,15 +45,15 @@ router.get('/stats', authMiddleware, async (req, res) => {
     try {
         const user_id = req.user.id;
 
-        const [stats] = await db.execute(
+        const result = await db.query(
             `SELECT 
                 COUNT(*) as total_sessions,
                 SUM(study_minutes * cycles) as total_minutes
-            FROM sessions WHERE user_id = ?`,
+            FROM sessions WHERE user_id = $1`,
             [user_id]
         );
 
-        res.json(stats[0]);
+        res.json(result.rows[0]);
 
     } catch (error) {
         console.error(error);
@@ -61,13 +61,13 @@ router.get('/stats', authMiddleware, async (req, res) => {
     }
 });
 
-// DELETE ALL SESSIONS
+// DELETE ALL SESSIONS FOR USER
 router.delete('/', authMiddleware, async (req, res) => {
     try {
         const user_id = req.user.id;
 
-        await db.execute(
-            'DELETE FROM sessions WHERE user_id = ?',
+        await db.query(
+            'DELETE FROM sessions WHERE user_id = $1',
             [user_id]
         );
 

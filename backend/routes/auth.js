@@ -10,23 +10,23 @@ router.post('/signup', async (req, res) => {
     try {
         const { name, email, password } = req.body;
 
-        const [existing] = await db.execute(
-            'SELECT * FROM users WHERE email = ?', [email]
+        const existing = await db.query(
+            'SELECT * FROM users WHERE email = $1', [email]
         );
 
-        if (existing.length > 0) {
+        if (existing.rows.length > 0) {
             return res.status(400).json({ message: 'Email already registered' });
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        const [result] = await db.execute(
-            'INSERT INTO users (name, email, password) VALUES (?, ?, ?)',
+        const result = await db.query(
+            'INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING id',
             [name, email, hashedPassword]
         );
 
         const token = jwt.sign(
-            { id: result.insertId, name, email },
+            { id: result.rows[0].id, name, email },
             process.env.JWT_SECRET,
             { expiresIn: '7d' }
         );
@@ -34,7 +34,7 @@ router.post('/signup', async (req, res) => {
         res.status(201).json({
             message: 'Account created successfully',
             token,
-            user: { id: result.insertId, name, email }
+            user: { id: result.rows[0].id, name, email }
         });
 
     } catch (error) {
@@ -48,15 +48,15 @@ router.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        const [users] = await db.execute(
-            'SELECT * FROM users WHERE email = ?', [email]
+        const result = await db.query(
+            'SELECT * FROM users WHERE email = $1', [email]
         );
 
-        if (users.length === 0) {
+        if (result.rows.length === 0) {
             return res.status(400).json({ message: 'Invalid email or password' });
         }
 
-        const user = users[0];
+        const user = result.rows[0];
 
         const validPassword = await bcrypt.compare(password, user.password);
 
