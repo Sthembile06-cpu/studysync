@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../config/db');
-const { authenticate } = require('../middleware/auth');
+const authModule = require('../middleware/auth');
+const authenticate = authModule.authenticate || authModule;
 const router = express.Router();
 
 function makeInviteCode() {
