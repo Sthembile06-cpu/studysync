@@ -75,17 +75,17 @@ router.get('/:id', authenticate, async (req, res) => {
   }
 });
 
-// JOIN by invite code
+// JOIN by invite code - accepts inviteCode or invite_code
 router.post('/join', authenticate, async (req, res) => {
   try {
-    const { inviteCode } = req.body;
+    const inviteCode = req.body.inviteCode || req.body.invite_code;
     const userId = req.user.id;
 
     if (!inviteCode) return res.status(400).json({ message: 'Invite code required' });
 
     const groupRes = await db.query(
       'SELECT * FROM groups WHERE UPPER(invite_code) = UPPER($1)',
-      [inviteCode.trim()]
+      [inviteCode.toString().trim()]
     );
 
     if (groupRes.rowCount === 0) {
