@@ -47,10 +47,16 @@ router.post('/', authenticate, async (req, res) => {
   }
 });
 
-// GET all groups
+// GET my groups - only groups user has joined
 router.get('/', authenticate, async (req, res) => {
   try {
-    const result = await db.query('SELECT * FROM groups ORDER BY created_at DESC');
+    const result = await db.query(
+      `SELECT g.* FROM groups g
+       JOIN group_members gm ON g.id = gm.group_id
+       WHERE gm.user_id = $1
+       ORDER BY g.created_at DESC`,
+      [req.user.id]
+    );
     res.json(result.rows);
   } catch (e) {
     console.error('GET groups failed', e);
