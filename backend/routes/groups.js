@@ -47,11 +47,14 @@ router.post('/', authenticate, async (req, res) => {
   }
 });
 
-// GET my groups - only groups user has joined
+// GET my groups - with member count and tutor_name alias
 router.get('/', authenticate, async (req, res) => {
   try {
     const result = await db.query(
-      `SELECT g.* FROM groups g
+      `SELECT g.*,
+        g.tutor AS tutor_name,
+        (SELECT COUNT(*)::int FROM group_members WHERE group_id = g.id) AS member_count
+       FROM groups g
        JOIN group_members gm ON g.id = gm.group_id
        WHERE gm.user_id = $1
        ORDER BY g.created_at DESC`,
@@ -67,7 +70,13 @@ router.get('/', authenticate, async (req, res) => {
 // GET single group
 router.get('/:id', authenticate, async (req, res) => {
   try {
-    const result = await db.query('SELECT * FROM groups WHERE id = $1', [req.params.id]);
+    const result = await db.query(
+      `SELECT g.*,
+        g.tutor AS tutor_name,
+        (SELECT COUNT(*)::int FROM group_members WHERE group_id = g.id) AS member_count
+       FROM groups g WHERE g.id = $1`,
+      [req.params.id]
+    );
     if (result.rowCount === 0) return res.status(404).json({ message: 'Group not found' });
     res.json(result.rows[0]);
   } catch (e) {
@@ -75,7 +84,7 @@ router.get('/:id', authenticate, async (req, res) => {
   }
 });
 
-// JOIN by invite code - accepts inviteCode or invite_code
+// JOIN by invite code
 router.post('/join', authenticate, async (req, res) => {
   try {
     const inviteCode = req.body.inviteCode || req.body.invite_code;
@@ -116,17 +125,19 @@ router.post('/:id/leave', authenticate, async (req, res) => {
   }
 });
 
-// GET members
+// GET members - with role
 router.get('/:id/members', authenticate, async (req, res) => {
   try {
     const result = await db.query(
-      `SELECT u.id, u.name, u.email FROM users u
+      `SELECT u.id, u.name, u.email, u.role FROM users u
        JOIN group_members gm ON u.id = gm.user_id
-       WHERE gm.group_id = $1`,
+       WHERE gm.group_id = $1
+       ORDER BY u.role DESC, u.name ASC`,
       [req.params.id]
     );
     res.json(result.rows);
   } catch (e) {
+    console.error('GET members failed', e);
     res.status(500).json({ error: e.message });
   }
 });
