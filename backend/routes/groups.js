@@ -26,4 +26,12 @@ router.post('/', async (req, res) => {
     }
 });
 
+router.delete('/:id', authenticate, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM group_members WHERE group_id = $1', [req.params.id]);
+    await pool.query('DELETE FROM groups WHERE id = $1', [req.params.id]);
+    res.json({ message: 'Deleted' });
+  } catch(e){ res.status(500).json({error:e.message}) }
+});
+
 module.exports = router;
