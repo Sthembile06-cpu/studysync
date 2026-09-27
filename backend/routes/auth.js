@@ -8,7 +8,8 @@ require('dotenv').config();
 // SIGN UP
 router.post('/signup', async (req, res) => {
     try {
-        const { name, email, password } = req.body;
+        const { name, email, password, role } = req.body;
+        const userRole = role === 'tutor'? 'tutor' : 'student';
 
         const existing = await db.query(
             'SELECT * FROM users WHERE email = $1', [email]
@@ -21,12 +22,14 @@ router.post('/signup', async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, 10);
 
         const result = await db.query(
-            'INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING id',
-            [name, email, hashedPassword]
+            'INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4) RETURNING id, role',
+            [name, email, hashedPassword, userRole]
         );
 
+        const newUser = result.rows[0];
+
         const token = jwt.sign(
-            { id: result.rows[0].id, name, email },
+            { id: newUser.id, name, email, role: newUser.role },
             process.env.JWT_SECRET,
             { expiresIn: '7d' }
         );
@@ -34,7 +37,7 @@ router.post('/signup', async (req, res) => {
         res.status(201).json({
             message: 'Account created successfully',
             token,
-            user: { id: result.rows[0].id, name, email }
+            user: { id: newUser.id, name, email, role: newUser.role }
         });
 
     } catch (error) {
@@ -65,7 +68,7 @@ router.post('/login', async (req, res) => {
         }
 
         const token = jwt.sign(
-            { id: user.id, name: user.name, email: user.email },
+            { id: user.id, name: user.name, email: user.email, role: user.role || 'student' },
             process.env.JWT_SECRET,
             { expiresIn: '7d' }
         );
@@ -73,7 +76,7 @@ router.post('/login', async (req, res) => {
         res.json({
             message: 'Logged in successfully',
             token,
-            user: { id: user.id, name: user.name, email: user.email }
+            user: { id: user.id, name: user.name, email: user.email, role: user.role || 'student' }
         });
 
     } catch (error) {
