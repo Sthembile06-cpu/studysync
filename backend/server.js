@@ -44,6 +44,25 @@ async function initializeDatabase() {
             )
         `);
 
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS groups (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                description TEXT,
+                tutor_id INT REFERENCES users(id),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS group_members (
+                group_id INT REFERENCES groups(id) ON DELETE CASCADE,
+                user_id INT REFERENCES users(id) ON DELETE CASCADE,
+                joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (group_id, user_id)
+            )
+        `);
+
         console.log('Database tables ready');
     } catch (error) {
         console.error('Database initialization error:', error.message);
@@ -54,6 +73,7 @@ async function initializeDatabase() {
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/sessions', require('./routes/sessions'));
 app.use('/api/users', require('./routes/users'));
+app.use('/api/groups', require('./routes/groups'));
 
 app.get('/', (req, res) => {
     res.json({ message: 'StudySync API is running!' });
