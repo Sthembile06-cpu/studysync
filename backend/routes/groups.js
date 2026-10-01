@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const pool = require('../db');
+const pool = require('../config/db');
 const auth = require('../middleware/auth');
 
 // --- existing groups routes you have... keep them ---
