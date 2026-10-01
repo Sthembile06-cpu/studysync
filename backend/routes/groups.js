@@ -142,24 +142,13 @@ router.get('/:id/members', authenticate, async (req, res) => {
   }
 });
 
-// DELETE group
-router.delete('/:id', authenticate, async (req, res) => {
-  try {
-    await db.query('DELETE FROM group_members WHERE group_id = $1', [req.params.id]);
-    const del = await db.query('DELETE FROM groups WHERE id = $1', [req.params.id]);
-    res.json({ message: 'Deleted', count: del.rowCount });
-  } catch (e) {
-    console.error('DELETE failed', e);
-    res.status(500).json({ error: e.message });
-  }
-});
-
-
+// GET messages for a group - FIXED
 router.get('/:id/messages', authenticate, async (req, res) => {
   try {
     const result = await db.query(
-      `SELECT gm.id, gm.message, gm.created_at, gm.user_id as sender_id,
-              u.name as sender_name
+      `SELECT gm.id, gm.message, gm.created_at,
+              gm.user_id as sender_id,
+              COALESCE(gm.user_name, u.name) as sender_name
        FROM group_messages gm
        LEFT JOIN users u ON u.id = gm.user_id
        WHERE gm.group_id = $1
@@ -173,19 +162,35 @@ router.get('/:id/messages', authenticate, async (req, res) => {
   }
 });
 
+// POST new message - FIXED for user_name NOT NULL bug
 router.post('/:id/messages', authenticate, async (req, res) => {
   try {
     const { message } = req.body;
     if (!message ||!message.trim()) return res.status(400).json({ message: 'Message empty' });
 
+    const senderName = req.user.name || req.user.email || 'User';
+
     const result = await db.query(
-      `INSERT INTO group_messages (group_id, user_id, message)
-       VALUES ($1, $2, $3) RETURNING *`,
-      [req.params.id, req.user.id, message.trim()]
+      `INSERT INTO group_messages (group_id, user_id, user_name, message)
+       VALUES ($1, $2, $3, $4) RETURNING *`,
+      [req.params.id, req.user.id, senderName, message.trim()]
     );
     res.status(201).json(result.rows[0]);
   } catch (e) {
     console.error('POST message failed', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// DELETE group
+router.delete('/:id', authenticate, async (req, res) => {
+  try {
+    await db.query('DELETE FROM group_members WHERE group_id = $1', [req.params.id]);
+    await db.query('DELETE FROM group_messages WHERE group_id = $1', [req.params.id]);
+    const del = await db.query('DELETE FROM groups WHERE id = $1', [req.params.id]);
+    res.json({ message: 'Deleted', count: del.rowCount });
+  } catch (e) {
+    console.error('DELETE failed', e);
     res.status(500).json({ error: e.message });
   }
 });
