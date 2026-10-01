@@ -154,4 +154,40 @@ router.delete('/:id', authenticate, async (req, res) => {
   }
 });
 
+
+router.get('/:id/messages', authenticate, async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT gm.id, gm.message, gm.created_at, gm.user_id as sender_id,
+              u.name as sender_name
+       FROM group_messages gm
+       LEFT JOIN users u ON u.id = gm.user_id
+       WHERE gm.group_id = $1
+       ORDER BY gm.created_at ASC`,
+      [req.params.id]
+    );
+    res.json(result.rows);
+  } catch (e) {
+    console.error('GET messages failed', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.post('/:id/messages', authenticate, async (req, res) => {
+  try {
+    const { message } = req.body;
+    if (!message ||!message.trim()) return res.status(400).json({ message: 'Message empty' });
+
+    const result = await db.query(
+      `INSERT INTO group_messages (group_id, user_id, message)
+       VALUES ($1, $2, $3) RETURNING *`,
+      [req.params.id, req.user.id, message.trim()]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (e) {
+    console.error('POST message failed', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
