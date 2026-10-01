@@ -65,11 +65,36 @@ await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) DEFA
             )
         `);
 
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS tasks (
+                id SERIAL PRIMARY KEY,
+                group_id INT REFERENCES groups(id) ON DELETE CASCADE,
+                title TEXT NOT NULL,
+                description TEXT,
+                due_date DATE,
+                created_by INT,
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            )
+        `);
+
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS materials (
+                id SERIAL PRIMARY KEY,
+                group_id INT REFERENCES groups(id) ON DELETE CASCADE,
+                file_name TEXT,
+                file_url TEXT,
+                uploaded_by INT,
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            )
+        `);
+
         console.log('Database tables ready');
     } catch (error) {
         console.error('Database initialization error:', error.message);
     }
 }
+
+initializeDatabase();
 
 // routes
 app.use('/api/auth', require('./routes/auth'));
