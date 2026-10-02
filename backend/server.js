@@ -88,6 +88,16 @@ await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) DEFA
             )
         `);
 
+                await db.query(`
+            CREATE TABLE IF NOT EXISTS password_resets (
+                id SERIAL PRIMARY KEY,
+                user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                token_hash VARCHAR(64) NOT NULL,
+                expires_at TIMESTAMPTZ NOT NULL,
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            )
+        `);
+
         console.log('Database tables ready');
     } catch (error) {
         console.error('Database initialization error:', error.message);
