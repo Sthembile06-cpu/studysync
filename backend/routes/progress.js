@@ -109,4 +109,90 @@ router.get('/history', requireAuth, async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 });
+
+const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const dayStr = (d) => d.toISOString().slice(0, 10);
+const addDays = (d, n) => new Date(d.getTime() + n * 86400000);
+
+function mostCommon(values) {
+  const counts = {};
+  values.forEach(v => { counts[v] = (counts[v] || 0) + 1; });
+  let best = null;
+  Object.keys(counts).forEach(k => { if (best === null || counts[k] > counts[best]) best = k; });
+  return best;
+}
+
+// GET /api/progress/stats
+router.get('/stats', requireAuth, async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT study_minutes * cycles AS minutes, sound,
+              to_char(local_at, 'YYYY-MM-DD') AS day,
+              EXTRACT(HOUR FROM local_at)::int AS hour,
+              EXTRACT(ISODOW FROM local_at)::int AS dow
+       FROM (
+         SELECT study_minutes, cycles, sound,
+                (completed_at AT TIME ZONE 'UTC') AT TIME ZONE '${TZ}' AS local_at
+         FROM sessions WHERE user_id = $1
+         ORDER BY completed_at DESC LIMIT 5000
+       ) s`,
+      [req.user.id]
+    );
+    const rows = result.rows;
+    const totalSessions = rows.length;
+    const totalMinutes = rows.reduce((sum, r) => sum + r.minutes, 0);
+
+    const studied = new Set(rows.map(r => r.day));
+    const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: TZ });
+    const today = new Date(todayStr + 'T00:00:00Z');
+
+    // Current streak (still alive if the last session was yesterday)
+    let cursor = studied.has(todayStr) ? today : addDays(today, -1);
+    let currentStreak = 0;
+    while (studied.has(dayStr(cursor))) {
+      currentStreak++;
+      cursor = addDays(cursor, -1);
+    }
+
+    // Longest streak ever
+    let longestStreak = 0, run = 0, prev = null;
+    for (const d of [...studied].sort()) {
+      if (prev && dayStr(addDays(new Date(prev + 'T00:00:00Z'), 1)) === d) run++;
+      else run = 1;
+      longestStreak = Math.max(longestStreak, run);
+      prev = d;
+    }
+
+    // Minutes for each day of this week, Monday to Sunday
+    const monday = addDays(today, -((today.getUTCDay() || 7) - 1));
+    const minutesByDay = {};
+    rows.forEach(r => { minutesByDay[r.day] = (minutesByDay[r.day] || 0) + r.minutes; });
+    const weekly = Array.from({ length: 7 }, (_, i) => minutesByDay[dayStr(addDays(monday, i))] || 0);
+
+    // Best study day (most minutes overall)
+    const byDow = Array(8).fill(0);
+    rows.forEach(r => { byDow[r.dow] += r.minutes; });
+    let bestDow = 0;
+    for (let i = 1; i <= 7; i++) if (byDow[i] > byDow[bestDow]) bestDow = i;
+
+    const bucket = (h) => h >= 5 && h < 12 ? 'Morning'
+      : h >= 12 && h < 17 ? 'Afternoon'
+      : h >= 17 && h < 21 ? 'Evening' : 'Night';
+
+    res.json({
+      totalSessions,
+      totalMinutes,
+      currentStreak,
+      longestStreak,
+      weekly,
+      bestDay: bestDow ? DAY_NAMES[bestDow - 1] : '-',
+      avgSession: totalSessions ? Math.round(totalMinutes / totalSessions) : 0,
+      favouriteSound: mostCommon(rows.map(r => r.sound).filter(s => s && s !== 'None')) || 'None',
+      productiveTime: totalSessions ? mostCommon(rows.map(r => bucket(r.hour))) : '-',
+    });
+  } catch (err) {
+    console.error('stats failed:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 module.exports = router;
