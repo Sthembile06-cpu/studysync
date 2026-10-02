@@ -80,4 +80,33 @@ router.get('/summary', requireAuth, async (req, res) => {
   }
 });
 
+const RANGES = { week: '7 days', month: '30 days' };
+
+// GET /api/progress/history?range=all|week|month
+router.get('/history', requireAuth, async (req, res) => {
+  const interval = RANGES[req.query.range]; // undefined means "all"
+  try {
+    const result = await db.query(
+      `SELECT id, study_minutes, break_minutes, cycles, sound,
+              to_char((completed_at AT TIME ZONE 'UTC') AT TIME ZONE '${TZ}', 'Mon FMDD, YYYY') AS date
+       FROM sessions
+       WHERE user_id = $1
+       ${interval ? `AND completed_at >= (NOW() AT TIME ZONE 'UTC') - INTERVAL '${interval}'` : ''}
+       ORDER BY completed_at DESC
+       LIMIT 200`,
+      [req.user.id]
+    );
+    res.json(result.rows.map(r => ({
+      id: r.id,
+      date: r.date,
+      studyMinutes: r.study_minutes,
+      breakMinutes: r.break_minutes,
+      cycles: r.cycles,
+      sound: r.sound,
+    })));
+  } catch (err) {
+    console.error('history failed:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 module.exports = router;
