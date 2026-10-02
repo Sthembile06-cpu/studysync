@@ -1,12 +1,7 @@
 const express = require('express');
 const crypto = require('crypto');
-const bcrypt = require('bcrypt'); // change to 'bcryptjs' if that's what your login uses
-const { createClient } = require('@supabase/supabase-js');
-
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+const bcrypt = require('bcrypt'); // change to 'bcryptjs' if routes/auth.js uses that
+const db = require('../config/db');
 
 const router = express.Router();
 
@@ -35,34 +30,26 @@ async function sendResetEmail(to, link) {
 
 // POST /api/auth/forgot-password  { email }
 router.post('/forgot-password', async (req, res) => {
-  const email = String(req.body.email || '').trim().toLowerCase();
+  const email = String((req.body && req.body.email) || '').trim().toLowerCase();
 
   // Always answer the same way so nobody can probe which emails exist.
   res.json({ message: 'If an account exists, a reset link has been sent.' });
 
   if (!email) return;
   try {
-    const { data: user, error: userErr } = await supabase
-      .from('users')
-      .select('id')
-      .eq('email', email)
-      .maybeSingle();
-    if (userErr) throw userErr;
-    if (!user) return;
-    const userId = String(user.id);
+    const result = await db.query('SELECT id FROM users WHERE LOWER(email) = $1 LIMIT 1', [email]);
+    if (result.rows.length === 0) return;
+    const userId = result.rows[0].id;
 
     const token = crypto.randomBytes(32).toString('hex');
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
-    const { error: delErr } = await supabase.from('password_resets').delete().eq('user_id', userId);
-    if (delErr) throw delErr;
-
-    const { error: insErr } = await supabase.from('password_resets').insert({
-      user_id: userId,
-      token_hash: tokenHash,
-      expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
-    });
-    if (insErr) throw insErr;
+    await db.query('DELETE FROM password_resets WHERE user_id = $1', [userId]);
+    await db.query(
+      `INSERT INTO password_resets (user_id, token_hash, expires_at)
+       VALUES ($1, $2, NOW() + INTERVAL '1 hour')`,
+      [userId, tokenHash]
+    );
 
     await sendResetEmail(email, `${API_URL}/api/auth/reset-link?token=${token}`);
   } catch (err) {
@@ -103,24 +90,20 @@ router.post('/reset-password', async (req, res) => {
   try {
     const tokenHash = crypto.createHash('sha256').update(String(token)).digest('hex');
 
-    const { data: row, error: findErr } = await supabase
-      .from('password_resets')
-      .select('user_id')
-      .eq('token_hash', tokenHash)
-      .gt('expires_at', new Date().toISOString())
-      .maybeSingle();
-    if (findErr) throw findErr;
-    if (!row) return res.status(400).json({ message: 'Invalid or expired link' });
+    const found = await db.query(
+      `SELECT user_id FROM password_resets
+       WHERE token_hash = $1 AND expires_at > NOW()
+       LIMIT 1`,
+      [tokenHash]
+    );
+    if (found.rows.length === 0) {
+      return res.status(400).json({ message: 'Invalid or expired link' });
+    }
+    const userId = found.rows[0].user_id;
 
     const hashed = await bcrypt.hash(String(password), 10);
-
-    const { error: updErr } = await supabase
-      .from('users')
-      .update({ password: hashed }) // change 'password' if your column is named differently
-      .eq('id', row.user_id);
-    if (updErr) throw updErr;
-
-    await supabase.from('password_resets').delete().eq('user_id', row.user_id);
+    await db.query('UPDATE users SET password = $1 WHERE id = $2', [hashed, userId]);
+    await db.query('DELETE FROM password_resets WHERE user_id = $1', [userId]);
 
     res.json({ message: 'Password updated' });
   } catch (err) {
