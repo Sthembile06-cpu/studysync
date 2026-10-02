@@ -38,7 +38,10 @@ router.post('/forgot-password', async (req, res) => {
   if (!email) return;
   try {
     const result = await db.query('SELECT id FROM users WHERE LOWER(email) = $1 LIMIT 1', [email]);
-    if (result.rows.length === 0) return;
+        if (result.rows.length === 0) {
+      console.log('forgot-password: no account for', email);
+      return;
+    }
     const userId = result.rows[0].id;
 
     const token = crypto.randomBytes(32).toString('hex');
@@ -51,7 +54,9 @@ router.post('/forgot-password', async (req, res) => {
       [userId, tokenHash]
     );
 
+        console.log('forgot-password: sending email to', email);
     await sendResetEmail(email, `${API_URL}/api/auth/reset-link?token=${token}`);
+    console.log('forgot-password: Brevo accepted the email for', email);
   } catch (err) {
     console.error('forgot-password failed:', err);
   }
