@@ -1,6 +1,6 @@
 const express = require('express');
 const crypto = require('crypto');
-const bcrypt = require('bcrypt'); // change to 'bcryptjs' if routes/auth.js uses that
+const bcrypt = require('bcryptjs'); // change to 'bcryptjs' if routes/auth.js uses that
 const db = require('../config/db');
 
 const router = express.Router();
