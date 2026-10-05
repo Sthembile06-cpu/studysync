@@ -113,6 +113,7 @@ app.use('/api/sessions', require('./routes/sessions'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/groups', require('./routes/groups'));
 app.use('/api/progress', require('./routes/progress'));
+app.use('/api/profile', require('./routes/profile'));
 
 app.get('/', (req, res) => {
     res.json({ message: 'StudySync API is running!' });
