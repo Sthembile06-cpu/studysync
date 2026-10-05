@@ -195,4 +195,15 @@ router.get('/stats', requireAuth, async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 });
+
+router.delete('/data', requireAuth, async (req, res) => {
+  try {
+    await db.query('DELETE FROM sessions WHERE user_id = $1', [req.user.id]);
+    await db.query('DELETE FROM achievements WHERE user_id = $1', [req.user.id]);
+    res.json({ message: 'Data cleared' });
+  } catch (err) {
+    console.error('clear data failed:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 module.exports = router;
