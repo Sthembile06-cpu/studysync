@@ -55,6 +55,15 @@ router.get('/:id/live', requireAuth, async (req, res) => {
     if (!access.found) return res.status(404).json({ message: 'Group not found' });
     if (!access.isMember) return res.status(403).json({ message: 'Not a member of this group' });
 
+        await require('./groupMembers').ensureColumns();
+    if (!access.isTutor) {
+      const b = await db.query(
+        'SELECT blocked FROM group_members WHERE group_id = $1 AND user_id = $2',
+        [groupId, req.user.id]
+      );
+      if (b.rows.length > 0 && b.rows[0].blocked) return res.json({ room: null });
+    }
+
     const result = await db.query(
       `SELECT CASE WHEN live_started_at > NOW() - INTERVAL '${LIVE_HOURS} hours'
                    THEN live_room ELSE NULL END AS room
