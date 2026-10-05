@@ -100,4 +100,15 @@ router.put('/:id/members/:userId/block', requireAuth, async (req, res) => {
     }
 
     const result = await db.query(
-      'UPDATE group_members SET blocked = $1 WHERE
+      'UPDATE group_members SET blocked = $1 WHERE group_id = $2 AND user_id = $3',
+      [blocked, groupId, targetId]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ message: 'Member not found' });
+    res.json({ message: blocked ? 'Member blocked' : 'Member unblocked' });
+  } catch (err) {
+    console.error('block member failed:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+module.exports = router;
