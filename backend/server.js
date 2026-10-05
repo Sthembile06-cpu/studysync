@@ -111,7 +111,9 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/auth', require('./routes/passwordReset'));
 app.use('/api/sessions', require('./routes/sessions'));
 app.use('/api/users', require('./routes/users'));
+app.use('/api/groups', require('./routes/groupMembers'));
 app.use('/api/groups', require('./routes/groups'));
+app.use('/api/groups', require('./routes/groupLive'));
 app.use('/api/progress', require('./routes/progress'));
 app.use('/api/profile', require('./routes/profile'));
 
