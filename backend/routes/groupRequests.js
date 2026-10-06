@@ -82,6 +82,26 @@ router.get('/discover', auth, ready, async (req, res) => {
   }
 });
 
+// GET /api/groups/pending-summary
+// For a tutor's home screen: which of THEIR groups have pending join requests, and how many.
+router.get('/pending-summary', auth, ready, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT g.id AS group_id, g.name AS group_name, COUNT(r.id)::int AS pending
+       FROM groups g
+       JOIN group_join_requests r ON r.group_id = g.id AND r.status = 'pending'
+       WHERE g.tutor_id = $1
+       GROUP BY g.id, g.name
+       ORDER BY pending DESC, g.name ASC`,
+      [req.user.id]
+    );
+    res.json(r.rows);
+  } catch (e) {
+    console.error('pending summary failed:', e);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // POST /api/groups/:id/requests  (student asks to join; repeating it does nothing)
 router.post('/:id/requests', auth, ready, loadGroup, async (req, res) => {
   try {
