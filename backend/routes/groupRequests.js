@@ -75,7 +75,50 @@ router.get('/discover', auth, ready, async (req, res) => {
        ORDER BY g.created_at DESC`,
       [req.user.id]
     );
-    res.json(r.rows);
+
+    // Rank: groups that match the student's modules, or already have classmates from the
+    // same course, come first. If anything here fails the plain list is returned as before.
+    let rows = r.rows.map((row) => ({ ...row, recommended: false }));
+    try {
+      const me = await pool.query(
+        'SELECT course, modules FROM student_academic_info WHERE user_id = $1',
+        [req.user.id]
+      );
+      if (me.rows.length > 0 && rows.length > 0) {
+        const { course, modules } = me.rows[0];
+        const classmates = new Map();
+        if (course) {
+          const c = await pool.query(
+            `SELECT gm.group_id, COUNT(*)::int AS n
+             FROM group_members gm
+             JOIN student_academic_info s ON s.user_id = gm.user_id
+             WHERE s.course = $1 AND gm.group_id = ANY($2::int[])
+             GROUP BY gm.group_id`,
+            [course, rows.map((x) => x.id)]
+          );
+          c.rows.forEach((x) => classmates.set(x.group_id, x.n));
+        }
+        const keys = (modules || []).map((m) => ({
+          name: String(m).replace(/\s*\d+\s*$/, '').trim().toLowerCase(),
+          code: (String(m).match(/(\d+)\s*$/) || [])[1]
+        }));
+        rows = rows
+          .map((row, i) => {
+            const text = `${row.name} ${row.description || ''}`.toLowerCase();
+            const moduleHit = keys.some(
+              (k) => (k.name && text.includes(k.name)) || (k.code && text.includes(k.code))
+            );
+            const score = (moduleHit ? 10 : 0) + Math.min(classmates.get(row.id) || 0, 9);
+            return { ...row, recommended: score > 0, _score: score, _i: i };
+          })
+          .sort((a, b) => b._score - a._score || a._i - b._i)
+          .map(({ _score, _i, ...rest }) => rest);
+      }
+    } catch (e) {
+      console.error('discover ranking skipped:', e.message);
+    }
+
+    res.json(rows);
   } catch (e) {
     console.error('discover failed:', e);
     res.status(500).json({ message: 'Server error' });
