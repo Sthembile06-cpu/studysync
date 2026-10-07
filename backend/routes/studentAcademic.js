@@ -100,4 +100,67 @@ router.put('/academic', auth, ready, async (req, res) => {
   }
 });
 
+// GET /api/student/home-feed
+// Upcoming tasks and recent materials from the groups the logged-in student belongs to.
+router.get('/home-feed', auth, async (req, res) => {
+  let tasks = [];
+  let materials = [];
+  try {
+    const t = await pool.query(
+      `SELECT t.id, t.title, g.name AS group_name, to_char(t.due_date, 'YYYY-MM-DD') AS due_date
+       FROM tasks t
+       JOIN groups g ON g.id = t.group_id
+       JOIN group_members gm ON gm.group_id = g.id AND gm.user_id = $1
+       WHERE t.due_date IS NULL OR t.due_date >= CURRENT_DATE
+       ORDER BY t.due_date ASC NULLS LAST, t.created_at DESC
+       LIMIT 5`,
+      [req.user.id]
+    );
+    tasks = t.rows;
+  } catch (e) {
+    console.error('home feed tasks failed:', e.message);
+  }
+  try {
+    const m = await pool.query(
+      `SELECT m.id, m.file_name, g.name AS group_name, m.created_at
+       FROM materials m
+       JOIN groups g ON g.id = m.group_id
+       JOIN group_members gm ON gm.group_id = g.id AND gm.user_id = $1
+       ORDER BY m.created_at DESC
+       LIMIT 5`,
+      [req.user.id]
+    );
+    materials = m.rows;
+  } catch (e) {
+    console.error('home feed materials failed:', e.message);
+  }
+  res.json({ tasks, materials });
+});
+
+// GET /api/student/group/:id/members  (the group's tutor only)
+// Course and year for each student in the group.
+router.get('/group/:id/members', auth, ready, async (req, res) => {
+  const groupId = parseInt(req.params.id, 10);
+  if (!Number.isInteger(groupId)) return res.status(400).json({ message: 'Invalid group' });
+  try {
+    const g = await pool.query('SELECT tutor_id FROM groups WHERE id = $1', [groupId]);
+    if (g.rows.length === 0) return res.status(404).json({ message: 'Group not found' });
+    if (Number(g.rows[0].tutor_id) !== Number(req.user.id)) {
+      return res.status(403).json({ message: 'Only the group tutor can see this' });
+    }
+    const r = await pool.query(
+      `SELECT gm.user_id, s.university, s.course, s.academic_year
+       FROM group_members gm
+       JOIN users u ON u.id = gm.user_id
+       LEFT JOIN student_academic_info s ON s.user_id = gm.user_id
+       WHERE gm.group_id = $1 AND u.role = 'student'`,
+      [groupId]
+    );
+    res.json(r.rows);
+  } catch (e) {
+    console.error('group members academic failed:', e);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 module.exports = router;
