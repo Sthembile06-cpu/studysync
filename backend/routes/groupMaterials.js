@@ -29,8 +29,12 @@ function ready(req, res, next) {
 }
 
 // ---------- file storage (Supabase Storage, called from the server so the key never reaches the app) ----------
-const STORAGE_URL = (process.env.SUPABASE_URL || '').replace(/\/+$/, '');
-const STORAGE_KEY = process.env.SUPABASE_SERVICE_KEY || '';
+// Accepts the project URL even if it was pasted with /rest/v1, /storage/v1 or a trailing slash
+const STORAGE_URL = (process.env.SUPABASE_URL || '')
+  .trim()
+  .replace(/\/(rest|storage|auth)\/v1.*$/i, '')
+  .replace(/\/+$/, '');
+const STORAGE_KEY = (process.env.SUPABASE_SERVICE_KEY || '').trim();
 const BUCKET = process.env.SUPABASE_BUCKET || 'materials';
 const MAX_BYTES = 20 * 1024 * 1024; // 20 MB
 
