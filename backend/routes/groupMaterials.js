@@ -28,6 +28,67 @@ function ready(req, res, next) {
     });
 }
 
+// ---------- file storage (Supabase Storage, called from the server so the key never reaches the app) ----------
+const STORAGE_URL = (process.env.SUPABASE_URL || '').replace(/\/+$/, '');
+const STORAGE_KEY = process.env.SUPABASE_SERVICE_KEY || '';
+const BUCKET = process.env.SUPABASE_BUCKET || 'materials';
+const MAX_BYTES = 20 * 1024 * 1024; // 20 MB
+
+const MIME_BY_EXT = {
+  pdf: 'application/pdf',
+  doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  ppt: 'application/vnd.ms-powerpoint',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  xls: 'application/vnd.ms-excel',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  txt: 'text/plain',
+  csv: 'text/csv',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  webp: 'image/webp',
+  gif: 'image/gif'
+};
+
+// Works with both key styles: the newer sb_secret_... keys go in `apikey` only,
+// the older service_role keys (a JWT) are also sent as a Bearer token.
+function storageHeaders(extra) {
+  const headers = { apikey: STORAGE_KEY, ...(extra || {}) };
+  if (!STORAGE_KEY.startsWith('sb_')) headers.Authorization = `Bearer ${STORAGE_KEY}`;
+  return headers;
+}
+
+function storageReady() {
+  return Boolean(STORAGE_URL && STORAGE_KEY && typeof fetch === 'function');
+}
+
+function storagePathFromUrl(url) {
+  const prefix = `${STORAGE_URL}/storage/v1/object/public/${BUCKET}/`;
+  return url && STORAGE_URL && String(url).startsWith(prefix) ? String(url).slice(prefix.length) : null;
+}
+
+async function removeFromStorage(objectPath) {
+  if (!objectPath || !storageReady()) return;
+  try {
+    await fetch(`${STORAGE_URL}/storage/v1/object/${BUCKET}/${objectPath}`, {
+      method: 'DELETE',
+      headers: storageHeaders()
+    });
+  } catch (e) {
+    console.error('storage cleanup failed:', e.message);
+  }
+}
+
+// Values come in URL-encoded (so any language fits in a header)
+function headerText(req, name, max) {
+  try {
+    return decodeURIComponent(String(req.headers[name] || '')).trim().slice(0, max);
+  } catch (e) {
+    return '';
+  }
+}
+
 // The group must exist and the caller must belong to it (its tutor counts as a member).
 async function loadAccess(req, res, next) {
   const groupId = parseInt(req.params.id, 10);
@@ -132,16 +193,83 @@ router.post('/:id/materials', auth, ready, loadAccess, tutorOnly, async (req, re
   }
 });
 
+// POST /api/groups/:id/materials/upload  (tutor only)
+// The app sends the raw file bytes (Content-Type: application/octet-stream) with the details in headers:
+// X-File-Name, X-Title, X-Description, X-File-Type (all URL-encoded). Max 20 MB.
+router.post(
+  '/:id/materials/upload',
+  auth,
+  ready,
+  loadAccess,
+  tutorOnly,
+  (req, res, next) => {
+    if (!storageReady()) {
+      return res.status(503).json({ message: 'File uploads are not set up on the server yet' });
+    }
+    next();
+  },
+  express.raw({ type: () => true, limit: MAX_BYTES }),
+  async (req, res) => {
+    const original = headerText(req, 'x-file-name', 200) || 'file';
+    const ext = (original.includes('.') ? original.split('.').pop() : '').toLowerCase();
+    const mime = MIME_BY_EXT[ext];
+    if (!mime) return res.status(400).json({ message: 'That file type is not supported' });
+    if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+      return res.status(400).json({ message: 'No file received' });
+    }
+
+    const title = headerText(req, 'x-title', 200) || original.replace(/\.[^.]+$/, '');
+    const description = headerText(req, 'x-description', 1000);
+    const typeHeader = headerText(req, 'x-file-type', 20);
+    const fileType = ['PDF', 'Image', 'Document'].includes(typeHeader) ? typeHeader : 'Document';
+
+    const safeName = original.replace(/[^A-Za-z0-9._-]+/g, '_').slice(-80);
+    const objectPath = `${req.groupId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeName}`;
+
+    try {
+      const up = await fetch(`${STORAGE_URL}/storage/v1/object/${BUCKET}/${objectPath}`, {
+        method: 'POST',
+        headers: storageHeaders({ 'Content-Type': mime, 'x-upsert': 'false' }),
+        body: req.body
+      });
+      if (!up.ok) {
+        console.error('storage upload failed:', up.status, await up.text());
+        return res.status(502).json({ message: 'Could not store the file' });
+      }
+
+      const fileUrl = `${STORAGE_URL}/storage/v1/object/public/${BUCKET}/${objectPath}`;
+      try {
+        const r = await pool.query(
+          `INSERT INTO materials (group_id, file_name, description, file_type, file_url, uploaded_by)
+           VALUES ($1, $2, $3, $4, $5, $6)
+           RETURNING id`,
+          [req.groupId, title, description, fileType, fileUrl, req.user.id]
+        );
+        res.status(201).json({ id: r.rows[0].id, file_url: fileUrl });
+      } catch (dbErr) {
+        await removeFromStorage(objectPath); // don't leave a file nobody can see
+        throw dbErr;
+      }
+    } catch (e) {
+      console.error('upload material failed:', e);
+      res.status(500).json({ message: 'Server error' });
+    }
+  }
+);
+
 // DELETE /api/groups/:id/materials/:materialId  (tutor only)
 router.delete('/:id/materials/:materialId', auth, ready, loadAccess, tutorOnly, async (req, res) => {
   const materialId = parseInt(req.params.materialId, 10);
   if (!Number.isInteger(materialId)) return res.status(400).json({ message: 'Invalid material' });
   try {
-    const r = await pool.query(
-      'DELETE FROM materials WHERE id = $1 AND group_id = $2',
+    const found = await pool.query(
+      'SELECT file_url FROM materials WHERE id = $1 AND group_id = $2',
       [materialId, req.groupId]
     );
-    if (r.rowCount === 0) return res.status(404).json({ message: 'Material not found' });
+    if (found.rows.length === 0) return res.status(404).json({ message: 'Material not found' });
+
+    await pool.query('DELETE FROM materials WHERE id = $1 AND group_id = $2', [materialId, req.groupId]);
+    await removeFromStorage(storagePathFromUrl(found.rows[0].file_url)); // only removes files we stored
     res.json({ message: 'Material removed' });
   } catch (e) {
     console.error('delete material failed:', e);
