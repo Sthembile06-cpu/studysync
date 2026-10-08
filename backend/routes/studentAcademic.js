@@ -153,7 +153,7 @@ router.get('/group/:id/members', auth, ready, async (req, res) => {
        FROM group_members gm
        JOIN users u ON u.id = gm.user_id
        LEFT JOIN student_academic_info s ON s.user_id = gm.user_id
-       WHERE gm.group_id = $1 AND u.role = 'student'`,
+       WHERE gm.group_id = $1 AND COALESCE(u.role, 'student') <> 'tutor'`,
       [groupId]
     );
     res.json(r.rows);
@@ -184,7 +184,9 @@ router.get('/tutor/students', auth, ready, async (req, res) => {
        JOIN group_members gm ON gm.group_id = g.id
        JOIN users u ON u.id = gm.user_id
        LEFT JOIN student_academic_info s ON s.user_id = u.id
-       WHERE g.tutor_id = $1 AND u.role = 'student'
+       WHERE g.tutor_id = $1
+         AND gm.user_id <> g.tutor_id
+         AND COALESCE(u.role, 'student') <> 'tutor'
        GROUP BY u.id, u.name, u.email, s.university, s.course, s.academic_year, s.modules, s.carry_over_modules
        ORDER BY u.name ASC`,
       [req.user.id]
