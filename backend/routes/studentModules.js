@@ -87,6 +87,11 @@ async function ownsModule(userId, module) {
   return r.rows.length > 0;
 }
 
+// DP in SQL: same weights as WEIGHTS, rounded down
+const DP_WEIGHT_CASE = `CASE mm.assessment
+  WHEN 'test1' THEN 25 WHEN 'test2' THEN 35 WHEN 'practical' THEN 20
+  WHEN 'assignments' THEN 10 WHEN 'quizzes' THEN 10 ELSE 0 END`;
+
 // Every student who belongs to one of the calling tutor's groups
 const TUTOR_STUDENT_IDS = `
   SELECT DISTINCT gm.user_id
@@ -327,9 +332,43 @@ router.get('/tutor/overview', auth, ready, async (req, res) => {
        ORDER BY r.created_at ASC`,
       [req.user.id]
     );
-    res.json({ at_risk: alerts.rows, requests: requests.rows });
+    const modules = await pool.query(
+      `SELECT mm.user_id, mm.module,
+              FLOOR(SUM(mm.mark * ${DP_WEIGHT_CASE}) / 100.0)::int AS dp,
+              COUNT(*)::int AS marks_entered
+       FROM module_marks mm
+       WHERE mm.user_id IN (${TUTOR_STUDENT_IDS})
+       GROUP BY mm.user_id, mm.module
+       ORDER BY mm.user_id, dp ASC`,
+      [req.user.id]
+    );
+    res.json({ at_risk: alerts.rows, requests: requests.rows, modules: modules.rows });
   } catch (e) {
     console.error('tutor overview failed:', e);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// GET /api/modules/tutor/requests
+// Pending assignment requests from the tutor's students, with their DP and topics studied.
+router.get('/tutor/requests', auth, ready, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT r.id, r.user_id, u.name AS student_name, r.module, r.created_at,
+              (SELECT COUNT(*)::int FROM module_topics_done t
+                 WHERE t.user_id = r.user_id AND t.module = r.module) AS topics_done,
+              (SELECT COALESCE(FLOOR(SUM(mm.mark * ${DP_WEIGHT_CASE}) / 100.0), 0)::int
+                 FROM module_marks mm
+                 WHERE mm.user_id = r.user_id AND mm.module = r.module) AS dp
+       FROM assignment_requests r
+       JOIN users u ON u.id = r.user_id
+       WHERE r.status = 'pending' AND r.user_id IN (${TUTOR_STUDENT_IDS})
+       ORDER BY r.created_at ASC`,
+      [req.user.id]
+    );
+    res.json(r.rows);
+  } catch (e) {
+    console.error('tutor requests failed:', e);
     res.status(500).json({ message: 'Server error' });
   }
 });
