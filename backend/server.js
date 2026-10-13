@@ -114,6 +114,7 @@ app.use('/api/users', require('./routes/users'));
 app.use('/api/groups', require('./routes/groupMembers'));
 app.use('/api/groups', require('./routes/groupRequests'));   // must stay above groups.js
 app.use('/api/groups', require('./routes/groupMaterials'));  // must stay above groups.js
+app.use('/api/groups', require('./routes/groupTasks'));      // must stay above groups.js
 app.use('/api/groups', require('./routes/groups'));
 app.use('/api/groups', require('./routes/groupLive'));
 app.use('/api/student', require('./routes/studentAcademic'));
