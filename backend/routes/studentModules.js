@@ -174,12 +174,33 @@ router.get('/detail', auth, ready, async (req, res) => {
       'SELECT 1 FROM dp_alerts WHERE user_id = $1 AND module = $2',
       [req.user.id, module]
     );
+    // The latest assignment a tutor uploaded for this student and module. Never breaks the screen if it can't be read.
+    let assignment = null;
+    try {
+      const a = await pool.query(
+        `SELECT t.id AS task_id, t.title, t.attachment_name, t.attachment_url,
+                to_char(t.due_date, 'YYYY-MM-DD') AS due_date, g.name AS group_name,
+                (EXISTS (SELECT 1 FROM task_submissions s WHERE s.task_id = t.id AND s.user_id = $1)
+                 OR EXISTS (SELECT 1 FROM task_completions c WHERE c.task_id = t.id AND c.user_id = $1)) AS done
+         FROM assignment_requests r
+         JOIN tasks t ON t.id = r.task_id
+         JOIN groups g ON g.id = t.group_id
+         WHERE r.user_id = $1 AND r.module = $2 AND r.task_id IS NOT NULL
+         ORDER BY r.created_at DESC
+         LIMIT 1`,
+        [req.user.id, module]
+      );
+      assignment = a.rows[0] || null;
+    } catch (e) {
+      console.error('module assignment lookup skipped:', e.message);
+    }
     res.json({
       module,
       marks,
       topics_done: topicsRes.rows.map((r) => r.topic),
       assignment_pending: pending.rows.length > 0,
-      alerted: alert.rows.length > 0
+      alerted: alert.rows.length > 0,
+      assignment
     });
   } catch (e) {
     console.error('module detail failed:', e);
@@ -357,6 +378,9 @@ router.get('/tutor/requests', auth, ready, async (req, res) => {
       `SELECT r.id, r.user_id, u.name AS student_name, r.module, r.created_at,
               (SELECT COUNT(*)::int FROM module_topics_done t
                  WHERE t.user_id = r.user_id AND t.module = r.module) AS topics_done,
+              (SELECT COALESCE(array_agg(t.topic ORDER BY t.done_at), '{}')
+                 FROM module_topics_done t
+                 WHERE t.user_id = r.user_id AND t.module = r.module) AS topics,
               (SELECT COALESCE(FLOOR(SUM(mm.mark * ${DP_WEIGHT_CASE}) / 100.0), 0)::int
                  FROM module_marks mm
                  WHERE mm.user_id = r.user_id AND mm.module = r.module) AS dp
