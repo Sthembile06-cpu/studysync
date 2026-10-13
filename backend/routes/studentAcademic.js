@@ -111,7 +111,7 @@ router.get('/home-feed', auth, async (req, res) => {
        JOIN groups g ON g.id = t.group_id
        JOIN group_members gm ON gm.group_id = g.id AND gm.user_id = $1
        WHERE (t.due_date IS NULL OR t.due_date >= CURRENT_DATE)
-       ${hideDone ? 'AND NOT EXISTS (SELECT 1 FROM task_completions c WHERE c.task_id = t.id AND c.user_id = $1)' : ''}
+       ${hideDone ? 'AND NOT EXISTS (SELECT 1 FROM task_completions c WHERE c.task_id = t.id AND c.user_id = $1) AND NOT EXISTS (SELECT 1 FROM task_submissions sb WHERE sb.task_id = t.id AND sb.user_id = $1)' : ''}
        ORDER BY t.due_date ASC NULLS LAST, t.created_at DESC
        LIMIT 5`;
     let t;
