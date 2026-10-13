@@ -3,229 +3,414 @@ const router = express.Router();
 const pool = require('../config/db');
 const auth = require('../middleware/auth');
 
-// ---------- one-time setup: the student academic info table ----------
-let tableReady = null;
-function ensureTable() {
-  if (!tableReady) {
-    tableReady = pool
-      .query(`
-        CREATE TABLE IF NOT EXISTS student_academic_info (
-          user_id INT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-          university TEXT,
-          faculty TEXT,
-          school TEXT,
-          course TEXT,
-          academic_year TEXT,
-          modules TEXT[] NOT NULL DEFAULT '{}',
-          carry_over_modules TEXT[] NOT NULL DEFAULT '{}',
-          updated_at TIMESTAMPTZ DEFAULT NOW()
-        )
-      `)
-      .catch((err) => { tableReady = null; throw err; }); // retry on the next request if it failed
+// How the DP is worked out (matches the app): weights add up to 100
+const WEIGHTS = { test1: 25, test2: 35, practical: 20, assignments: 10, quizzes: 10 };
+const AT_RISK_BELOW = 60;      // a DP under this raises an alert for the tutor
+const TOPICS_TO_UNLOCK = 3;    // topics studied before a student can request an assignment
+
+// ---------- one-time setup: new tables (nothing existing is changed) ----------
+let tablesReady = null;
+function ensureTables() {
+  if (!tablesReady) {
+    tablesReady = (async () => {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS module_marks (
+          user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          module TEXT NOT NULL,
+          assessment VARCHAR(20) NOT NULL,
+          mark INT NOT NULL CHECK (mark >= 0 AND mark <= 100),
+          updated_at TIMESTAMPTZ DEFAULT NOW(),
+          PRIMARY KEY (user_id, module, assessment)
+        )`);
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS module_topics_done (
+          user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          module TEXT NOT NULL,
+          topic TEXT NOT NULL,
+          done_at TIMESTAMPTZ DEFAULT NOW(),
+          PRIMARY KEY (user_id, module, topic)
+        )`);
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS dp_alerts (
+          user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          module TEXT NOT NULL,
+          dp INT NOT NULL,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW(),
+          PRIMARY KEY (user_id, module)
+        )`);
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS assignment_requests (
+          id SERIAL PRIMARY KEY,
+          user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          module TEXT NOT NULL,
+          status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'handled')),
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        )`);
+      await pool.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS assignment_requests_one_pending_idx
+        ON assignment_requests (user_id, module) WHERE status = 'pending'`);
+    })().catch((err) => { tablesReady = null; throw err; }); // retry on the next request if it failed
   }
-  return tableReady;
+  return tablesReady;
 }
-ensureTable().catch((e) => console.error('student_academic_info setup failed:', e.message));
+ensureTables().catch((e) => console.error('module tables setup failed:', e.message));
 
 function ready(req, res, next) {
-  ensureTable()
+  ensureTables()
     .then(() => next())
     .catch((e) => {
-      console.error('student_academic_info not ready:', e.message);
+      console.error('module tables not ready:', e.message);
       res.status(500).json({ message: 'Server error' });
     });
 }
 
-function cleanText(value, max = 200) {
-  return String(value == null ? '' : value).trim().slice(0, max);
+// ---------- helpers ----------
+function dpFrom(marks) {
+  let total = 0;
+  for (const [key, weight] of Object.entries(WEIGHTS)) total += (Number(marks[key]) || 0) * weight;
+  return Math.floor(total / 100);
 }
 
-function cleanList(value) {
-  if (!Array.isArray(value)) return [];
-  return value.slice(0, 50).map((v) => cleanText(v)).filter((v) => v.length > 0);
+function cleanModule(value) {
+  return String(value == null ? '' : value).trim().slice(0, 200);
 }
 
-// GET /api/student/academic -> the logged-in student's saved academic info ({} if none yet)
-router.get('/academic', auth, ready, async (req, res) => {
+// A student can only track modules they chose (or carry over) on their profile.
+async function ownsModule(userId, module) {
+  if (!module) return false;
+  const r = await pool.query(
+    `SELECT 1 FROM student_academic_info
+     WHERE user_id = $1 AND ($2 = ANY(modules) OR $2 = ANY(carry_over_modules))`,
+    [userId, module]
+  );
+  return r.rows.length > 0;
+}
+
+// DP in SQL: same weights as WEIGHTS, rounded down
+const DP_WEIGHT_CASE = `CASE mm.assessment
+  WHEN 'test1' THEN 25 WHEN 'test2' THEN 35 WHEN 'practical' THEN 20
+  WHEN 'assignments' THEN 10 WHEN 'quizzes' THEN 10 ELSE 0 END`;
+
+// Every student who belongs to one of the calling tutor's groups
+const TUTOR_STUDENT_IDS = `
+  SELECT DISTINCT gm.user_id
+  FROM group_members gm
+  JOIN groups g ON g.id = gm.group_id
+  WHERE g.tutor_id = $1 AND gm.user_id <> g.tutor_id`;
+
+// ---------- student routes ----------
+
+// GET /api/modules -> the student's modules with DP and progress
+router.get('/', auth, ready, async (req, res) => {
   try {
-    const r = await pool.query(
-      `SELECT university, faculty, school, course, academic_year, modules, carry_over_modules
-       FROM student_academic_info WHERE user_id = $1`,
-      [req.user.id]
+    const uid = req.user.id;
+    const info = await pool.query(
+      'SELECT modules, carry_over_modules FROM student_academic_info WHERE user_id = $1',
+      [uid]
     );
-    res.json(r.rows[0] || {});
+    if (info.rows.length === 0) return res.json([]);
+    const modules = info.rows[0].modules || [];
+    const carryOver = info.rows[0].carry_over_modules || [];
+
+    const marksRes = await pool.query(
+      'SELECT module, assessment, mark FROM module_marks WHERE user_id = $1',
+      [uid]
+    );
+    const marksByModule = new Map();
+    for (const row of marksRes.rows) {
+      if (!marksByModule.has(row.module)) marksByModule.set(row.module, {});
+      marksByModule.get(row.module)[row.assessment] = row.mark;
+    }
+    const topicsRes = await pool.query(
+      'SELECT module, COUNT(*)::int AS n FROM module_topics_done WHERE user_id = $1 GROUP BY module',
+      [uid]
+    );
+    const topicCounts = new Map(topicsRes.rows.map((r) => [r.module, r.n]));
+
+    const list = [
+      ...modules.map((m) => ({ module: m, carry_over: false })),
+      ...carryOver.filter((m) => !modules.includes(m)).map((m) => ({ module: m, carry_over: true }))
+    ].map(({ module, carry_over }) => {
+      const marks = marksByModule.get(module) || {};
+      return {
+        module,
+        carry_over,
+        dp: dpFrom(marks),
+        marks_entered: Object.keys(marks).length,
+        topics_done: topicCounts.get(module) || 0
+      };
+    });
+    res.json(list);
   } catch (e) {
-    console.error('get academic info failed:', e);
+    console.error('list modules failed:', e);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// PUT /api/student/academic
-// { university, faculty, school, course, academic_year, modules: [], carry_over_modules: [] }
-// Creates the row the first time, updates it after that.
-router.put('/academic', auth, ready, async (req, res) => {
-  const body = req.body || {};
-  const university = cleanText(body.university);
-  const faculty = cleanText(body.faculty);
-  const school = cleanText(body.school);
-  const course = cleanText(body.course);
-  const academicYear = cleanText(body.academic_year, 50);
-  const modules = cleanList(body.modules);
-  const carryOver = cleanList(body.carry_over_modules);
-
-  if (!university || !faculty || !school || !course) {
-    return res.status(400).json({ message: 'University, faculty, school and course are required' });
-  }
-
+// GET /api/modules/detail?module=Name
+router.get('/detail', auth, ready, async (req, res) => {
+  const module = cleanModule(req.query.module);
   try {
-    await pool.query(
-      `INSERT INTO student_academic_info
-         (user_id, university, faculty, school, course, academic_year, modules, carry_over_modules, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
-       ON CONFLICT (user_id) DO UPDATE SET
-         university = EXCLUDED.university,
-         faculty = EXCLUDED.faculty,
-         school = EXCLUDED.school,
-         course = EXCLUDED.course,
-         academic_year = EXCLUDED.academic_year,
-         modules = EXCLUDED.modules,
-         carry_over_modules = EXCLUDED.carry_over_modules,
-         updated_at = NOW()`,
-      [req.user.id, university, faculty, school, course, academicYear, modules, carryOver]
+    if (!(await ownsModule(req.user.id, module))) {
+      return res.status(404).json({ message: 'Module not found' });
+    }
+    const marksRes = await pool.query(
+      'SELECT assessment, mark FROM module_marks WHERE user_id = $1 AND module = $2',
+      [req.user.id, module]
     );
-    res.json({ message: 'Academic info saved' });
-  } catch (e) {
-    console.error('save academic info failed:', e);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
+    const marks = {};
+    marksRes.rows.forEach((r) => { marks[r.assessment] = r.mark; });
 
-// GET /api/student/home-feed
-// Upcoming tasks and recent materials from the groups the logged-in student belongs to.
-router.get('/home-feed', auth, async (req, res) => {
-  let tasks = [];
-  let materials = [];
-  try {
-    const feedSql = (hideDone) => `SELECT t.id, t.title, g.name AS group_name, to_char(t.due_date, 'YYYY-MM-DD') AS due_date
-       FROM tasks t
-       JOIN groups g ON g.id = t.group_id
-       JOIN group_members gm ON gm.group_id = g.id AND gm.user_id = $1
-       WHERE (t.due_date IS NULL OR t.due_date >= CURRENT_DATE)
-       ${hideDone ? 'AND NOT EXISTS (SELECT 1 FROM task_completions c WHERE c.task_id = t.id AND c.user_id = $1) AND NOT EXISTS (SELECT 1 FROM task_submissions sb WHERE sb.task_id = t.id AND sb.user_id = $1)' : ''}
-       ORDER BY t.due_date ASC NULLS LAST, t.created_at DESC
-       LIMIT 5`;
-    let t;
+    const topicsRes = await pool.query(
+      'SELECT topic FROM module_topics_done WHERE user_id = $1 AND module = $2',
+      [req.user.id, module]
+    );
+    const pending = await pool.query(
+      `SELECT 1 FROM assignment_requests WHERE user_id = $1 AND module = $2 AND status = 'pending'`,
+      [req.user.id, module]
+    );
+    const alert = await pool.query(
+      'SELECT 1 FROM dp_alerts WHERE user_id = $1 AND module = $2',
+      [req.user.id, module]
+    );
+    // The latest assignment a tutor uploaded for this student and module. Never breaks the screen if it can't be read.
+    let assignment = null;
     try {
-      t = await pool.query(feedSql(true), [req.user.id]);   // hides finished tasks
+      const a = await pool.query(
+        `SELECT t.id AS task_id, t.title, t.attachment_name, t.attachment_url,
+                to_char(t.due_date, 'YYYY-MM-DD') AS due_date, g.name AS group_name,
+                (EXISTS (SELECT 1 FROM task_submissions s WHERE s.task_id = t.id AND s.user_id = $1)
+                 OR EXISTS (SELECT 1 FROM task_completions c WHERE c.task_id = t.id AND c.user_id = $1)) AS done
+         FROM assignment_requests r
+         JOIN tasks t ON t.id = r.task_id
+         JOIN groups g ON g.id = t.group_id
+         WHERE r.user_id = $1 AND r.module = $2 AND r.task_id IS NOT NULL
+         ORDER BY r.created_at DESC
+         LIMIT 1`,
+        [req.user.id, module]
+      );
+      assignment = a.rows[0] || null;
     } catch (e) {
-      t = await pool.query(feedSql(false), [req.user.id]);  // finished-tasks table not ready: old behaviour
+      console.error('module assignment lookup skipped:', e.message);
     }
-    tasks = t.rows;
+    res.json({
+      module,
+      marks,
+      topics_done: topicsRes.rows.map((r) => r.topic),
+      assignment_pending: pending.rows.length > 0,
+      alerted: alert.rows.length > 0,
+      assignment
+    });
   } catch (e) {
-    console.error('home feed tasks failed:', e.message);
-  }
-  try {
-    const m = await pool.query(
-      `SELECT m.id, m.file_name, g.name AS group_name, m.created_at
-       FROM materials m
-       JOIN groups g ON g.id = m.group_id
-       JOIN group_members gm ON gm.group_id = g.id AND gm.user_id = $1
-       ORDER BY m.created_at DESC
-       LIMIT 5`,
-      [req.user.id]
-    );
-    materials = m.rows;
-  } catch (e) {
-    console.error('home feed materials failed:', e.message);
-  }
-  res.json({ tasks, materials });
-});
-
-// GET /api/student/group/:id/members  (the group's tutor only)
-// Course and year for each student in the group.
-router.get('/group/:id/members', auth, ready, async (req, res) => {
-  const groupId = parseInt(req.params.id, 10);
-  if (!Number.isInteger(groupId)) return res.status(400).json({ message: 'Invalid group' });
-  try {
-    const g = await pool.query('SELECT tutor_id FROM groups WHERE id = $1', [groupId]);
-    if (g.rows.length === 0) return res.status(404).json({ message: 'Group not found' });
-    if (Number(g.rows[0].tutor_id) !== Number(req.user.id)) {
-      return res.status(403).json({ message: 'Only the group tutor can see this' });
-    }
-    const r = await pool.query(
-      `SELECT gm.user_id, s.university, s.course, s.academic_year
-       FROM group_members gm
-       JOIN users u ON u.id = gm.user_id
-       LEFT JOIN student_academic_info s ON s.user_id = gm.user_id
-       WHERE gm.group_id = $1 AND COALESCE(u.role, 'student') <> 'tutor'`,
-      [groupId]
-    );
-    res.json(r.rows);
-  } catch (e) {
-    console.error('group members academic failed:', e);
+    console.error('module detail failed:', e);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// GET /api/student/tutor/students  (tutors only)
-// Every student in any of the tutor's groups, with course, year, modules, activity and groups.
-router.get('/tutor/students', auth, ready, async (req, res) => {
+// PUT /api/modules/marks  { module, marks: { test1, test2, practical, assignments, quizzes } }
+// Replaces the student's marks for that module (a missing key means "not entered").
+// Raises or clears the tutor alert depending on the resulting DP.
+router.put('/marks', auth, ready, async (req, res) => {
+  const body = req.body || {};
+  const module = cleanModule(body.module);
+  const input = body.marks && typeof body.marks === 'object' ? body.marks : null;
+  if (!module || !input) return res.status(400).json({ message: 'Invalid request' });
+
+  const clean = {};
+  for (const key of Object.keys(WEIGHTS)) {
+    if (input[key] === undefined || input[key] === null) continue;
+    const n = Number(input[key]);
+    if (!Number.isInteger(n) || n < 0 || n > 100) {
+      return res.status(400).json({ message: 'Marks must be whole numbers from 0 to 100' });
+    }
+    clean[key] = n;
+  }
+
+  let client;
   try {
-    const me = await pool.query('SELECT role FROM users WHERE id = $1', [req.user.id]);
-    if (me.rows.length === 0 || me.rows[0].role !== 'tutor') {
-      return res.status(403).json({ message: 'Only tutors can see this' });
+    if (!(await ownsModule(req.user.id, module))) {
+      return res.status(404).json({ message: 'Module not found' });
     }
 
-    const r = await pool.query(
-      `SELECT u.id, u.name, u.email,
-              s.university, s.course, s.academic_year, s.modules, s.carry_over_modules,
-              (SELECT COUNT(*)::int FROM sessions se WHERE se.user_id = u.id) AS sessions,
-              (SELECT COALESCE(SUM(se.study_minutes * se.cycles), 0)::int FROM sessions se WHERE se.user_id = u.id) AS total_minutes,
-              (SELECT MAX(se.completed_at) FROM sessions se WHERE se.user_id = u.id) AS last_session,
-              array_agg(DISTINCT g.name ORDER BY g.name) AS groups,
-              bool_or(COALESCE(gm.blocked, FALSE)) AS blocked
-       FROM groups g
-       JOIN group_members gm ON gm.group_id = g.id
-       JOIN users u ON u.id = gm.user_id
-       LEFT JOIN student_academic_info s ON s.user_id = u.id
-       WHERE g.tutor_id = $1
-         AND gm.user_id <> g.tutor_id
-         AND COALESCE(u.role, 'student') <> 'tutor'
-       GROUP BY u.id, u.name, u.email, s.university, s.course, s.academic_year, s.modules, s.carry_over_modules
-       ORDER BY u.name ASC`,
-      [req.user.id]
-    );
-    res.json(r.rows);
+    client = await pool.connect();
+    await client.query('BEGIN');
+    await client.query('DELETE FROM module_marks WHERE user_id = $1 AND module = $2', [req.user.id, module]);
+    for (const [assessment, mark] of Object.entries(clean)) {
+      await client.query(
+        'INSERT INTO module_marks (user_id, module, assessment, mark) VALUES ($1, $2, $3, $4)',
+        [req.user.id, module, assessment, mark]
+      );
+    }
+
+    const entered = Object.keys(clean).length;
+    const dp = dpFrom(clean);
+    const atRisk = entered > 0 && dp < AT_RISK_BELOW;
+    if (atRisk) {
+      await client.query(
+        `INSERT INTO dp_alerts (user_id, module, dp) VALUES ($1, $2, $3)
+         ON CONFLICT (user_id, module) DO UPDATE SET dp = EXCLUDED.dp, updated_at = NOW()`,
+        [req.user.id, module, dp]
+      );
+    } else {
+      await client.query('DELETE FROM dp_alerts WHERE user_id = $1 AND module = $2', [req.user.id, module]);
+    }
+    await client.query('COMMIT');
+    res.json({ dp, at_risk: atRisk, alerted: atRisk });
   } catch (e) {
-    console.error('tutor students failed:', e);
+    if (client) await client.query('ROLLBACK').catch(() => {});
+    console.error('save marks failed:', e);
     res.status(500).json({ message: 'Server error' });
+  } finally {
+    if (client) client.release();
   }
 });
 
-// PUT /api/student/tutor/students/:userId/block  { blocked: true | false }  (tutors only)
-// Blocks or unblocks the student in every group that belongs to the calling tutor.
-router.put('/tutor/students/:userId/block', auth, async (req, res) => {
-  const targetId = parseInt(req.params.userId, 10);
-  const blocked = req.body && req.body.blocked;
-  if (!Number.isInteger(targetId) || typeof blocked !== 'boolean') {
+// PUT /api/modules/topics  { module, topic, done }
+router.put('/topics', auth, ready, async (req, res) => {
+  const body = req.body || {};
+  const module = cleanModule(body.module);
+  const topic = String(body.topic == null ? '' : body.topic).trim().slice(0, 200);
+  if (!module || !topic || typeof body.done !== 'boolean') {
     return res.status(400).json({ message: 'Invalid request' });
   }
-  if (targetId === Number(req.user.id)) {
-    return res.status(400).json({ message: 'You cannot block yourself' });
-  }
   try {
-    // group_members.blocked is created by routes/groupMembers.js when the server starts
-    const r = await pool.query(
-      `UPDATE group_members gm
-       SET blocked = $1
-       FROM groups g
-       WHERE gm.group_id = g.id AND g.tutor_id = $2 AND gm.user_id = $3`,
-      [blocked, req.user.id, targetId]
+    if (!(await ownsModule(req.user.id, module))) {
+      return res.status(404).json({ message: 'Module not found' });
+    }
+    if (body.done) {
+      await pool.query(
+        `INSERT INTO module_topics_done (user_id, module, topic) VALUES ($1, $2, $3)
+         ON CONFLICT DO NOTHING`,
+        [req.user.id, module, topic]
+      );
+    } else {
+      await pool.query(
+        'DELETE FROM module_topics_done WHERE user_id = $1 AND module = $2 AND topic = $3',
+        [req.user.id, module, topic]
+      );
+    }
+    const c = await pool.query(
+      'SELECT COUNT(*)::int AS n FROM module_topics_done WHERE user_id = $1 AND module = $2',
+      [req.user.id, module]
     );
-    if (r.rowCount === 0) return res.status(404).json({ message: 'Student not found in your groups' });
-    res.json({ message: blocked ? 'Student blocked' : 'Student unblocked' });
+    res.json({ topics_done: c.rows[0].n });
   } catch (e) {
-    console.error('block student failed:', e);
+    console.error('save topic failed:', e);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// POST /api/modules/assignment-request  { module }
+router.post('/assignment-request', auth, ready, async (req, res) => {
+  const module = cleanModule(req.body && req.body.module);
+  try {
+    if (!(await ownsModule(req.user.id, module))) {
+      return res.status(404).json({ message: 'Module not found' });
+    }
+    const c = await pool.query(
+      'SELECT COUNT(*)::int AS n FROM module_topics_done WHERE user_id = $1 AND module = $2',
+      [req.user.id, module]
+    );
+    if (c.rows[0].n < TOPICS_TO_UNLOCK) {
+      return res.status(400).json({ message: `Study at least ${TOPICS_TO_UNLOCK} topics first` });
+    }
+    const existing = await pool.query(
+      `SELECT 1 FROM assignment_requests WHERE user_id = $1 AND module = $2 AND status = 'pending'`,
+      [req.user.id, module]
+    );
+    if (existing.rows.length === 0) {
+      try {
+        await pool.query('INSERT INTO assignment_requests (user_id, module) VALUES ($1, $2)', [req.user.id, module]);
+      } catch (e) {
+        if (e.code !== '23505') throw e; // already pending: fine
+      }
+    }
+    res.status(201).json({ status: 'pending' });
+  } catch (e) {
+    console.error('assignment request failed:', e);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// ---------- tutor routes ----------
+
+// GET /api/modules/tutor/overview
+// DP alerts and pending assignment requests for the students in the calling tutor's groups.
+router.get('/tutor/overview', auth, ready, async (req, res) => {
+  try {
+    const alerts = await pool.query(
+      `SELECT a.user_id, a.module, a.dp
+       FROM dp_alerts a
+       WHERE a.user_id IN (${TUTOR_STUDENT_IDS})
+       ORDER BY a.dp ASC`,
+      [req.user.id]
+    );
+    const requests = await pool.query(
+      `SELECT r.id, r.user_id, r.module
+       FROM assignment_requests r
+       WHERE r.status = 'pending' AND r.user_id IN (${TUTOR_STUDENT_IDS})
+       ORDER BY r.created_at ASC`,
+      [req.user.id]
+    );
+    const modules = await pool.query(
+      `SELECT mm.user_id, mm.module,
+              FLOOR(SUM(mm.mark * ${DP_WEIGHT_CASE}) / 100.0)::int AS dp,
+              COUNT(*)::int AS marks_entered
+       FROM module_marks mm
+       WHERE mm.user_id IN (${TUTOR_STUDENT_IDS})
+       GROUP BY mm.user_id, mm.module
+       ORDER BY mm.user_id, dp ASC`,
+      [req.user.id]
+    );
+    res.json({ at_risk: alerts.rows, requests: requests.rows, modules: modules.rows });
+  } catch (e) {
+    console.error('tutor overview failed:', e);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// GET /api/modules/tutor/requests
+// Pending assignment requests from the tutor's students, with their DP and topics studied.
+router.get('/tutor/requests', auth, ready, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT r.id, r.user_id, u.name AS student_name, r.module, r.created_at,
+              (SELECT COUNT(*)::int FROM module_topics_done t
+                 WHERE t.user_id = r.user_id AND t.module = r.module) AS topics_done,
+              (SELECT COALESCE(array_agg(t.topic ORDER BY t.done_at), '{}')
+                 FROM module_topics_done t
+                 WHERE t.user_id = r.user_id AND t.module = r.module) AS topics,
+              (SELECT COALESCE(FLOOR(SUM(mm.mark * ${DP_WEIGHT_CASE}) / 100.0), 0)::int
+                 FROM module_marks mm
+                 WHERE mm.user_id = r.user_id AND mm.module = r.module) AS dp
+       FROM assignment_requests r
+       JOIN users u ON u.id = r.user_id
+       WHERE r.status = 'pending' AND r.user_id IN (${TUTOR_STUDENT_IDS})
+       ORDER BY r.created_at ASC`,
+      [req.user.id]
+    );
+    res.json(r.rows);
+  } catch (e) {
+    console.error('tutor requests failed:', e);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// PUT /api/modules/tutor/assignment-requests/:id  (marks a request as handled)
+router.put('/tutor/assignment-requests/:id', auth, ready, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isInteger(id)) return res.status(400).json({ message: 'Invalid request' });
+  try {
+    const r = await pool.query(
+      `UPDATE assignment_requests SET status = 'handled'
+       WHERE id = $2 AND status = 'pending' AND user_id IN (${TUTOR_STUDENT_IDS})`,
+      [req.user.id, id]
+    );
+    if (r.rowCount === 0) return res.status(404).json({ message: 'Request not found' });
+    res.json({ message: 'Marked as handled' });
+  } catch (e) {
+    console.error('handle assignment request failed:', e);
     res.status(500).json({ message: 'Server error' });
   }
 });
