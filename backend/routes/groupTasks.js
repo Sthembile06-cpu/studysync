@@ -18,7 +18,8 @@ function ensureTables() {
       await pool.query(`
         ALTER TABLE tasks
           ADD COLUMN IF NOT EXISTS attachment_url TEXT,
-          ADD COLUMN IF NOT EXISTS attachment_name TEXT`);
+          ADD COLUMN IF NOT EXISTS attachment_name TEXT,
+          ADD COLUMN IF NOT EXISTS assigned_to INT REFERENCES users(id) ON DELETE CASCADE`);
       await pool.query(`
         CREATE TABLE IF NOT EXISTS task_submissions (
           task_id INT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
@@ -181,7 +182,8 @@ function tutorOnly(req, res, next) {
 const SELECT_TASKS = `
   SELECT t.id, t.group_id, g.name AS group_name, t.title, t.description,
          to_char(t.due_date, 'YYYY-MM-DD') AS due_date,
-         t.attachment_url, t.attachment_name,
+         t.attachment_url, t.attachment_name, t.assigned_to,
+         (SELECT u.name FROM users u WHERE u.id = t.assigned_to) AS assigned_name,
          (SELECT s.file_name FROM task_submissions s WHERE s.task_id = t.id AND s.user_id = $1) AS my_file_name,
          (SELECT s.file_url FROM task_submissions s WHERE s.task_id = t.id AND s.user_id = $1) AS my_file_url,
          (EXISTS (SELECT 1 FROM task_completions c WHERE c.task_id = t.id AND c.user_id = $1)
@@ -192,8 +194,9 @@ const SELECT_TASKS = `
                   SELECT user_id FROM task_submissions WHERE task_id = t.id) d
             JOIN group_members gm ON gm.group_id = t.group_id AND gm.user_id = d.user_id
             WHERE d.user_id <> g.tutor_id) AS done_count,
-         (SELECT COUNT(*)::int FROM group_members gm
-            WHERE gm.group_id = t.group_id AND gm.user_id <> g.tutor_id) AS total_students
+         (CASE WHEN t.assigned_to IS NOT NULL THEN 1
+               ELSE (SELECT COUNT(*)::int FROM group_members gm
+                       WHERE gm.group_id = t.group_id AND gm.user_id <> g.tutor_id) END) AS total_students
   FROM tasks t
   JOIN groups g ON g.id = t.group_id`;
 const ORDER_TASKS = 'ORDER BY t.due_date ASC NULLS LAST, t.created_at DESC';
@@ -204,7 +207,8 @@ router.get('/tasks/all', auth, ready, async (req, res) => {
     const r = await pool.query(
       `${SELECT_TASKS}
        WHERE g.tutor_id = $1
-          OR EXISTS (SELECT 1 FROM group_members m WHERE m.group_id = g.id AND m.user_id = $1)
+          OR (EXISTS (SELECT 1 FROM group_members m WHERE m.group_id = g.id AND m.user_id = $1)
+              AND (t.assigned_to IS NULL OR t.assigned_to = $1))
        ${ORDER_TASKS}
        LIMIT 200`,
       [req.user.id]
@@ -216,11 +220,29 @@ router.get('/tasks/all', auth, ready, async (req, res) => {
   }
 });
 
+// GET /api/groups/:id/tasks  (replaces the older version in groups.js: same data, but hides other students' personal assignments)
+router.get('/:id/tasks', auth, ready, loadAccess, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT t.* FROM tasks t
+       WHERE t.group_id = $2 AND (t.assigned_to IS NULL OR t.assigned_to = $1 OR $3 = TRUE)
+       ORDER BY t.created_at DESC`,
+      [req.user.id, req.groupId, req.isTutor]
+    );
+    res.json(r.rows);
+  } catch (e) {
+    console.error('plain task list failed:', e.message);
+    res.json([]);
+  }
+});
+
 // GET /api/groups/:id/task-list  -> one group's tasks with status
 router.get('/:id/task-list', auth, ready, loadAccess, async (req, res) => {
   try {
     const r = await pool.query(
-      `${SELECT_TASKS} WHERE t.group_id = $2 ${ORDER_TASKS}`,
+      `${SELECT_TASKS}
+       WHERE t.group_id = $2 AND (t.assigned_to IS NULL OR t.assigned_to = $1 OR g.tutor_id = $1)
+       ${ORDER_TASKS}`,
       [req.user.id, req.groupId]
     );
     res.json(r.rows);
@@ -264,6 +286,68 @@ router.post(
       }
     } catch (e) {
       console.error('create task with file failed:', e);
+      res.status(500).json({ message: 'Server error' });
+    }
+  }
+);
+
+// POST /api/groups/assignments/upload  (tutor answering one student's assignment request)
+// Raw file bytes; headers: X-Request-Id, X-File-Name, X-Title, X-Description, X-Due-Date (YYYY-MM-DD).
+// Creates a task for THAT STUDENT ONLY, and marks the request as handled.
+router.post(
+  '/assignments/upload',
+  auth, ready, storageGuard,
+  express.raw({ type: () => true, limit: MAX_BYTES }),
+  async (req, res) => {
+    const requestId = parseInt(headerText(req, 'x-request-id', 20), 10);
+    const title = headerText(req, 'x-title', 200) || 'Assignment';
+    const description = headerText(req, 'x-description', 1000);
+    const due = headerText(req, 'x-due-date', 10);
+    if (!Number.isInteger(requestId)) return res.status(400).json({ message: 'Invalid request' });
+    if (due && !/^\d{4}-\d{2}-\d{2}$/.test(due)) return res.status(400).json({ message: 'Invalid due date' });
+    const info = readFileInfo(req);
+    if (!info) return res.status(400).json({ message: 'That file type is not supported' });
+    if (!Buffer.isBuffer(req.body) || req.body.length === 0) return res.status(400).json({ message: 'No file received' });
+
+    let objectPath = null;
+    try {
+      const rr = await pool.query(
+        `SELECT r.id, r.user_id FROM assignment_requests r WHERE r.id = $1 AND r.status = 'pending'`,
+        [requestId]
+      );
+      if (rr.rows.length === 0) return res.status(404).json({ message: 'Request not found' });
+      const studentId = rr.rows[0].user_id;
+
+      // A group of this tutor that the student belongs to
+      const g = await pool.query(
+        `SELECT g.id FROM groups g
+         JOIN group_members gm ON gm.group_id = g.id AND gm.user_id = $2
+         WHERE g.tutor_id = $1
+         ORDER BY g.created_at DESC LIMIT 1`,
+        [req.user.id, studentId]
+      );
+      if (g.rows.length === 0) return res.status(403).json({ message: 'This student is not in one of your groups' });
+      const groupId = g.rows[0].id;
+
+      await pool.query('ALTER TABLE assignment_requests ADD COLUMN IF NOT EXISTS task_id INT');
+
+      objectPath = `assignments/${groupId}/${studentId}/${uniquePart()}-${info.safeName}`;
+      const url = await uploadToStorage(objectPath, req.body, info.mime);
+      if (!url) return res.status(502).json({ message: 'Could not store the file' });
+
+      const t = await pool.query(
+        `INSERT INTO tasks (group_id, title, description, due_date, created_by, attachment_url, attachment_name, assigned_to)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+        [groupId, title, description, due || null, req.user.id, url, info.original, studentId]
+      );
+      await pool.query(
+        `UPDATE assignment_requests SET status = 'handled', task_id = $2 WHERE id = $1`,
+        [requestId, t.rows[0].id]
+      );
+      res.status(201).json({ task_id: t.rows[0].id });
+    } catch (e) {
+      if (objectPath) await removeFromStorage(objectPath);
+      console.error('send assignment failed:', e);
       res.status(500).json({ message: 'Server error' });
     }
   }
@@ -324,7 +408,7 @@ router.get('/:id/tasks/:taskId/submissions', auth, ready, loadAccess, tutorOnly,
   const taskId = parseInt(req.params.taskId, 10);
   if (!Number.isInteger(taskId)) return res.status(400).json({ message: 'Invalid task' });
   try {
-    const t = await pool.query('SELECT 1 FROM tasks WHERE id = $1 AND group_id = $2', [taskId, req.groupId]);
+    const t = await pool.query('SELECT assigned_to FROM tasks WHERE id = $1 AND group_id = $2', [taskId, req.groupId]);
     if (t.rows.length === 0) return res.status(404).json({ message: 'Task not found' });
 
     const r = await pool.query(
@@ -333,8 +417,9 @@ router.get('/:id/tasks/:taskId/submissions', auth, ready, loadAccess, tutorOnly,
        JOIN users u ON u.id = gm.user_id
        LEFT JOIN task_submissions s ON s.task_id = $2 AND s.user_id = u.id
        WHERE gm.group_id = $1 AND gm.user_id <> $3
+         AND ($4::int IS NULL OR gm.user_id = $4::int)
        ORDER BY (s.submitted_at IS NULL), s.submitted_at DESC, u.name ASC`,
-      [req.groupId, taskId, req.tutorId]
+      [req.groupId, taskId, req.tutorId, t.rows[0].assigned_to]
     );
     res.json(r.rows);
   } catch (e) {
