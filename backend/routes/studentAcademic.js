@@ -106,16 +106,20 @@ router.get('/home-feed', auth, async (req, res) => {
   let tasks = [];
   let materials = [];
   try {
-    const t = await pool.query(
-      `SELECT t.id, t.title, g.name AS group_name, to_char(t.due_date, 'YYYY-MM-DD') AS due_date
+    const feedSql = (hideDone) => `SELECT t.id, t.title, g.name AS group_name, to_char(t.due_date, 'YYYY-MM-DD') AS due_date
        FROM tasks t
        JOIN groups g ON g.id = t.group_id
        JOIN group_members gm ON gm.group_id = g.id AND gm.user_id = $1
-       WHERE t.due_date IS NULL OR t.due_date >= CURRENT_DATE
+       WHERE (t.due_date IS NULL OR t.due_date >= CURRENT_DATE)
+       ${hideDone ? 'AND NOT EXISTS (SELECT 1 FROM task_completions c WHERE c.task_id = t.id AND c.user_id = $1)' : ''}
        ORDER BY t.due_date ASC NULLS LAST, t.created_at DESC
-       LIMIT 5`,
-      [req.user.id]
-    );
+       LIMIT 5`;
+    let t;
+    try {
+      t = await pool.query(feedSql(true), [req.user.id]);   // hides finished tasks
+    } catch (e) {
+      t = await pool.query(feedSql(false), [req.user.id]);  // finished-tasks table not ready: old behaviour
+    }
     tasks = t.rows;
   } catch (e) {
     console.error('home feed tasks failed:', e.message);
