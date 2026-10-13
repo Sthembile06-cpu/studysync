@@ -1,0 +1,153 @@
+const express = require('express');
+const router = express.Router();
+const pool = require('../config/db');
+const auth = require('../middleware/auth');
+
+// ---------- one-time setup: who has finished which task (new table, nothing existing is changed) ----------
+let tableReady = null;
+function ensureTable() {
+  if (!tableReady) {
+    tableReady = pool
+      .query(`
+        CREATE TABLE IF NOT EXISTS task_completions (
+          task_id INT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          done_at TIMESTAMPTZ DEFAULT NOW(),
+          PRIMARY KEY (task_id, user_id)
+        )`)
+      .catch((err) => { tableReady = null; throw err; }); // retry on the next request if it failed
+  }
+  return tableReady;
+}
+ensureTable().catch((e) => console.error('task_completions setup failed:', e.message));
+
+function ready(req, res, next) {
+  ensureTable()
+    .then(() => next())
+    .catch((e) => {
+      console.error('task_completions not ready:', e.message);
+      res.status(500).json({ message: 'Server error' });
+    });
+}
+
+// The group must exist and the caller must belong to it (its tutor counts as a member).
+async function loadAccess(req, res, next) {
+  const groupId = parseInt(req.params.id, 10);
+  if (!Number.isInteger(groupId)) return res.status(400).json({ message: 'Invalid group' });
+  try {
+    const g = await pool.query('SELECT tutor_id FROM groups WHERE id = $1', [groupId]);
+    if (g.rows.length === 0) return res.status(404).json({ message: 'Group not found' });
+
+    const isTutor = Number(g.rows[0].tutor_id) === Number(req.user.id);
+    let isMember = isTutor;
+    if (!isMember) {
+      const m = await pool.query(
+        'SELECT 1 FROM group_members WHERE group_id = $1 AND user_id = $2',
+        [groupId, req.user.id]
+      );
+      isMember = m.rows.length > 0;
+    }
+    if (!isMember) return res.status(403).json({ message: 'You are not a member of this group' });
+
+    req.groupId = groupId;
+    req.isTutor = isTutor;
+    next();
+  } catch (e) {
+    console.error('task access check failed:', e);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
+function tutorOnly(req, res, next) {
+  if (!req.isTutor) return res.status(403).json({ message: 'Only the group tutor can do this' });
+  next();
+}
+
+// Tasks with this caller's own status ($1 = caller) and, for tutors, how many students finished.
+const SELECT_TASKS = `
+  SELECT t.id, t.group_id, g.name AS group_name, t.title, t.description,
+         to_char(t.due_date, 'YYYY-MM-DD') AS due_date,
+         EXISTS (SELECT 1 FROM task_completions c WHERE c.task_id = t.id AND c.user_id = $1) AS done,
+         (SELECT COUNT(*)::int
+            FROM task_completions c
+            JOIN group_members gm ON gm.group_id = t.group_id AND gm.user_id = c.user_id
+            WHERE c.task_id = t.id AND c.user_id <> g.tutor_id) AS done_count,
+         (SELECT COUNT(*)::int FROM group_members gm
+            WHERE gm.group_id = t.group_id AND gm.user_id <> g.tutor_id) AS total_students
+  FROM tasks t
+  JOIN groups g ON g.id = t.group_id`;
+const ORDER_TASKS = 'ORDER BY t.due_date ASC NULLS LAST, t.created_at DESC';
+
+// GET /api/groups/tasks/all  -> tasks from every group the caller teaches or belongs to
+router.get('/tasks/all', auth, ready, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `${SELECT_TASKS}
+       WHERE g.tutor_id = $1
+          OR EXISTS (SELECT 1 FROM group_members m WHERE m.group_id = g.id AND m.user_id = $1)
+       ${ORDER_TASKS}
+       LIMIT 200`,
+      [req.user.id]
+    );
+    res.json(r.rows);
+  } catch (e) {
+    console.error('all tasks failed:', e);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// GET /api/groups/:id/task-list  -> one group's tasks with status
+router.get('/:id/task-list', auth, ready, loadAccess, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `${SELECT_TASKS} WHERE t.group_id = $2 ${ORDER_TASKS}`,
+      [req.user.id, req.groupId]
+    );
+    res.json(r.rows);
+  } catch (e) {
+    console.error('task list failed:', e);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// PUT /api/groups/:id/tasks/:taskId/done  { done: true | false }  (marks the caller's own status)
+router.put('/:id/tasks/:taskId/done', auth, ready, loadAccess, async (req, res) => {
+  const taskId = parseInt(req.params.taskId, 10);
+  const done = req.body && req.body.done;
+  if (!Number.isInteger(taskId) || typeof done !== 'boolean') {
+    return res.status(400).json({ message: 'Invalid request' });
+  }
+  try {
+    const t = await pool.query('SELECT 1 FROM tasks WHERE id = $1 AND group_id = $2', [taskId, req.groupId]);
+    if (t.rows.length === 0) return res.status(404).json({ message: 'Task not found' });
+
+    if (done) {
+      await pool.query(
+        'INSERT INTO task_completions (task_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+        [taskId, req.user.id]
+      );
+    } else {
+      await pool.query('DELETE FROM task_completions WHERE task_id = $1 AND user_id = $2', [taskId, req.user.id]);
+    }
+    res.json({ done });
+  } catch (e) {
+    console.error('mark task done failed:', e);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// DELETE /api/groups/:id/tasks/:taskId  (tutor only)
+router.delete('/:id/tasks/:taskId', auth, ready, loadAccess, tutorOnly, async (req, res) => {
+  const taskId = parseInt(req.params.taskId, 10);
+  if (!Number.isInteger(taskId)) return res.status(400).json({ message: 'Invalid task' });
+  try {
+    const r = await pool.query('DELETE FROM tasks WHERE id = $1 AND group_id = $2', [taskId, req.groupId]);
+    if (r.rowCount === 0) return res.status(404).json({ message: 'Task not found' });
+    res.json({ message: 'Task removed' });
+  } catch (e) {
+    console.error('delete task failed:', e);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+module.exports = router;
