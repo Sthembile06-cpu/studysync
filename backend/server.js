@@ -119,6 +119,7 @@ app.use('/api/groups', require('./routes/groups'));
 app.use('/api/groups', require('./routes/groupLive'));
 app.use('/api/student', require('./routes/studentAcademic'));
 app.use('/api/modules', require('./routes/studentModules'));
+app.use('/api/teaching', require('./routes/tutorModules'));
 app.use('/api/progress', require('./routes/progress'));
 app.use('/api/profile', require('./routes/profile'));
 app.use('/api/tutor', require('./routes/tutor'));
