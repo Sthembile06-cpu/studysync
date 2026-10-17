@@ -196,7 +196,15 @@ router.get('/tutor/students', auth, ready, async (req, res) => {
        ORDER BY u.name ASC`,
       [req.user.id]
     );
-    res.json(r.rows);
+    // Show only the student's modules that this tutor teaches
+    const mine = await pool.query('SELECT module FROM tutor_modules WHERE tutor_id = $1', [req.user.id]);
+    const taught = mine.rows.map((x) => x.module);
+    const keep = (list) => (list || []).filter((m) => taught.includes(m));
+    res.json(r.rows.map((row) => ({
+      ...row,
+      modules: keep(row.modules),
+      carry_over_modules: keep(row.carry_over_modules)
+    })));
   } catch (e) {
     console.error('tutor students failed:', e);
     res.status(500).json({ message: 'Server error' });
