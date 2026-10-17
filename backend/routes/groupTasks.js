@@ -312,11 +312,18 @@ router.post(
     let objectPath = null;
     try {
       const rr = await pool.query(
-        `SELECT r.id, r.user_id FROM assignment_requests r WHERE r.id = $1 AND r.status = 'pending'`,
+        `SELECT r.id, r.user_id, r.module FROM assignment_requests r WHERE r.id = $1 AND r.status = 'pending'`,
         [requestId]
       );
       if (rr.rows.length === 0) return res.status(404).json({ message: 'Request not found' });
       const studentId = rr.rows[0].user_id;
+
+      // Only a tutor of this module may answer its assignment requests
+      const teaches = await pool.query(
+        'SELECT 1 FROM tutor_modules WHERE tutor_id = $1 AND module = $2',
+        [req.user.id, rr.rows[0].module]
+      );
+      if (teaches.rows.length === 0) return res.status(403).json({ message: 'You do not tutor this module' });
 
       // A group of this tutor that the student belongs to
       const g = await pool.query(
