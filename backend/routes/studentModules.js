@@ -50,6 +50,13 @@ function ensureTables() {
       await pool.query(`
         CREATE UNIQUE INDEX IF NOT EXISTS assignment_requests_one_pending_idx
         ON assignment_requests (user_id, module) WHERE status = 'pending'`);
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS tutor_modules (
+          tutor_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          module TEXT NOT NULL,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          PRIMARY KEY (tutor_id, module)
+        )`);
     })().catch((err) => { tablesReady = null; throw err; }); // retry on the next request if it failed
   }
   return tablesReady;
@@ -85,6 +92,12 @@ async function ownsModule(userId, module) {
     [userId, module]
   );
   return r.rows.length > 0;
+}
+
+// The modules a tutor teaches. Tutors only ever see data for these modules.
+async function tutorModuleList(userId) {
+  const r = await pool.query('SELECT module FROM tutor_modules WHERE tutor_id = $1', [userId]);
+  return r.rows.map((x) => x.module);
 }
 
 // DP in SQL: same weights as WEIGHTS, rounded down
@@ -339,29 +352,30 @@ router.post('/assignment-request', auth, ready, async (req, res) => {
 // DP alerts and pending assignment requests for the students in the calling tutor's groups.
 router.get('/tutor/overview', auth, ready, async (req, res) => {
   try {
+    const mods = await tutorModuleList(req.user.id);
     const alerts = await pool.query(
       `SELECT a.user_id, a.module, a.dp
        FROM dp_alerts a
-       WHERE a.user_id IN (${TUTOR_STUDENT_IDS})
+       WHERE a.user_id IN (${TUTOR_STUDENT_IDS}) AND a.module = ANY($2::text[])
        ORDER BY a.dp ASC`,
-      [req.user.id]
+      [req.user.id, mods]
     );
     const requests = await pool.query(
       `SELECT r.id, r.user_id, r.module
        FROM assignment_requests r
-       WHERE r.status = 'pending' AND r.user_id IN (${TUTOR_STUDENT_IDS})
+       WHERE r.status = 'pending' AND r.user_id IN (${TUTOR_STUDENT_IDS}) AND r.module = ANY($2::text[])
        ORDER BY r.created_at ASC`,
-      [req.user.id]
+      [req.user.id, mods]
     );
     const modules = await pool.query(
       `SELECT mm.user_id, mm.module,
               FLOOR(SUM(mm.mark * ${DP_WEIGHT_CASE}) / 100.0)::int AS dp,
               COUNT(*)::int AS marks_entered
        FROM module_marks mm
-       WHERE mm.user_id IN (${TUTOR_STUDENT_IDS})
+       WHERE mm.user_id IN (${TUTOR_STUDENT_IDS}) AND mm.module = ANY($2::text[])
        GROUP BY mm.user_id, mm.module
        ORDER BY mm.user_id, dp ASC`,
-      [req.user.id]
+      [req.user.id, mods]
     );
     res.json({ at_risk: alerts.rows, requests: requests.rows, modules: modules.rows });
   } catch (e) {
@@ -374,6 +388,7 @@ router.get('/tutor/overview', auth, ready, async (req, res) => {
 // Pending assignment requests from the tutor's students, with their DP and topics studied.
 router.get('/tutor/requests', auth, ready, async (req, res) => {
   try {
+    const mods = await tutorModuleList(req.user.id);
     const r = await pool.query(
       `SELECT r.id, r.user_id, u.name AS student_name, r.module, r.created_at,
               (SELECT COUNT(*)::int FROM module_topics_done t
@@ -386,9 +401,9 @@ router.get('/tutor/requests', auth, ready, async (req, res) => {
                  WHERE mm.user_id = r.user_id AND mm.module = r.module) AS dp
        FROM assignment_requests r
        JOIN users u ON u.id = r.user_id
-       WHERE r.status = 'pending' AND r.user_id IN (${TUTOR_STUDENT_IDS})
+       WHERE r.status = 'pending' AND r.user_id IN (${TUTOR_STUDENT_IDS}) AND r.module = ANY($2::text[])
        ORDER BY r.created_at ASC`,
-      [req.user.id]
+      [req.user.id, mods]
     );
     res.json(r.rows);
   } catch (e) {
@@ -402,10 +417,12 @@ router.put('/tutor/assignment-requests/:id', auth, ready, async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (!Number.isInteger(id)) return res.status(400).json({ message: 'Invalid request' });
   try {
+    const mods = await tutorModuleList(req.user.id);
     const r = await pool.query(
       `UPDATE assignment_requests SET status = 'handled'
-       WHERE id = $2 AND status = 'pending' AND user_id IN (${TUTOR_STUDENT_IDS})`,
-      [req.user.id, id]
+       WHERE id = $2 AND status = 'pending' AND user_id IN (${TUTOR_STUDENT_IDS})
+         AND module = ANY($3::text[])`,
+      [req.user.id, id, mods]
     );
     if (r.rowCount === 0) return res.status(404).json({ message: 'Request not found' });
     res.json({ message: 'Marked as handled' });
