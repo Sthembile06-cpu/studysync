@@ -16,6 +16,7 @@ function ensureTables() {
           avatar_url TEXT,
           updated_at TIMESTAMPTZ DEFAULT NOW()
         )`);
+      await pool.query('ALTER TABLE user_profile_ext ADD COLUMN IF NOT EXISTS bio TEXT');
       await pool.query(`
         CREATE TABLE IF NOT EXISTS tutor_modules (
           tutor_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -113,7 +114,7 @@ router.get('/tutors', auth, ready, async (req, res) => {
   const q = String(req.query.q || '').trim().slice(0, 100);
   try {
     const r = await pool.query(
-      `SELECT u.id, u.name, e.avatar_url,
+      `SELECT u.id, u.name, e.avatar_url, e.bio,
               COALESCE((SELECT array_agg(tm.module ORDER BY tm.module) FROM tutor_modules tm WHERE tm.tutor_id = u.id), '{}') AS modules,
               ${AVG} AS avg_rating, ${CNT} AS rating_count,
               (SELECT COUNT(*)::int FROM groups g WHERE g.tutor_id = u.id) AS group_count
@@ -138,7 +139,7 @@ router.get('/students', auth, ready, async (req, res) => {
   const q = String(req.query.q || '').trim().slice(0, 100);
   try {
     const r = await pool.query(
-      `SELECT u.id, u.name, e.avatar_url, s.course, s.academic_year
+      `SELECT u.id, u.name, e.avatar_url, e.bio, s.course, s.academic_year
        FROM users u
        LEFT JOIN user_profile_ext e ON e.user_id = u.id
        LEFT JOIN student_academic_info s ON s.user_id = u.id
@@ -163,7 +164,7 @@ router.get('/brief', auth, ready, async (req, res) => {
   try {
     const r = await pool.query(
       `SELECT u.id, u.name, (CASE WHEN u.role = 'tutor' THEN 'tutor' ELSE 'student' END) AS role,
-              e.avatar_url,
+              e.avatar_url, e.bio,
               (CASE WHEN u.role = 'tutor' THEN u.email ELSE NULL END) AS email,
               (CASE WHEN e.show_phone THEN e.phone ELSE NULL END) AS phone,
               s.course, s.academic_year,
@@ -187,10 +188,26 @@ router.get('/brief', auth, ready, async (req, res) => {
 // ---------- my own contact details and picture ----------
 router.get('/me', auth, ready, async (req, res) => {
   try {
-    const r = await pool.query('SELECT phone, show_phone, avatar_url FROM user_profile_ext WHERE user_id = $1', [req.user.id]);
-    res.json(r.rows[0] || { phone: null, show_phone: false, avatar_url: null });
+    const r = await pool.query('SELECT phone, show_phone, avatar_url, bio FROM user_profile_ext WHERE user_id = $1', [req.user.id]);
+    res.json(r.rows[0] || { phone: null, show_phone: false, avatar_url: null, bio: null });
   } catch (e) {
     console.error('get my contact failed:', e);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// PUT /api/people/me/bio  { bio }  ("About you" from the profile screen, shown when others search or open this profile)
+router.put('/me/bio', auth, ready, async (req, res) => {
+  const bio = String((req.body && req.body.bio) || '').trim().slice(0, 600);
+  try {
+    await pool.query(
+      `INSERT INTO user_profile_ext (user_id, bio) VALUES ($1, $2)
+       ON CONFLICT (user_id) DO UPDATE SET bio = EXCLUDED.bio, updated_at = NOW()`,
+      [req.user.id, bio || null]
+    );
+    res.json({ message: 'Saved' });
+  } catch (e) {
+    console.error('save bio failed:', e);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -267,12 +284,13 @@ router.get('/profile/:id', auth, ready, async (req, res) => {
     const user = u.rows[0];
     const role = user.role === 'tutor' ? 'tutor' : 'student';
 
-    const ext = (await pool.query('SELECT phone, show_phone, avatar_url FROM user_profile_ext WHERE user_id = $1', [id])).rows[0] || {};
+    const ext = (await pool.query('SELECT phone, show_phone, avatar_url, bio FROM user_profile_ext WHERE user_id = $1', [id])).rows[0] || {};
     const out = {
       id: user.id,
       name: user.name,
       role,
       avatar_url: ext.avatar_url || null,
+      bio: ext.bio || null,
       email: role === 'tutor' ? user.email : null, // tutors share their email; student emails stay private
       phone: ext.show_phone && ext.phone ? ext.phone : null,
       chat: relation(await pairRow(me, id), me)
