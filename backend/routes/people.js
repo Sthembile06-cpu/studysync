@@ -155,6 +155,35 @@ router.get('/students', auth, ready, async (req, res) => {
   }
 });
 
+// GET /api/people/brief?ids=1,2,3  -> short profile cards (picture, name, role, contact) for people in a chat.
+// Only for tutors, people who share a group with me, and myself.
+router.get('/brief', auth, ready, async (req, res) => {
+  const ids = String(req.query.ids || '').split(',').map((x) => parseInt(x, 10)).filter(Number.isInteger).slice(0, 60);
+  if (ids.length === 0) return res.json([]);
+  try {
+    const r = await pool.query(
+      `SELECT u.id, u.name, (CASE WHEN u.role = 'tutor' THEN 'tutor' ELSE 'student' END) AS role,
+              e.avatar_url,
+              (CASE WHEN u.role = 'tutor' THEN u.email ELSE NULL END) AS email,
+              (CASE WHEN e.show_phone THEN e.phone ELSE NULL END) AS phone,
+              s.course, s.academic_year,
+              COALESCE((SELECT array_agg(tm.module ORDER BY tm.module) FROM tutor_modules tm WHERE tm.tutor_id = u.id), '{}') AS modules
+       FROM users u
+       LEFT JOIN user_profile_ext e ON e.user_id = u.id
+       LEFT JOIN student_academic_info s ON s.user_id = u.id
+       WHERE u.id = ANY($2::int[])
+         AND (u.id = $1 OR u.role = 'tutor'
+              OR EXISTS (SELECT 1 FROM group_members a JOIN group_members b ON b.group_id = a.group_id
+                         WHERE a.user_id = $1 AND b.user_id = u.id))`,
+      [req.user.id, ids]
+    );
+    res.json(r.rows);
+  } catch (e) {
+    console.error('brief failed:', e);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // ---------- my own contact details and picture ----------
 router.get('/me', auth, ready, async (req, res) => {
   try {
@@ -309,6 +338,24 @@ router.post('/tutors/:id/rating', auth, ready, async (req, res) => {
 });
 
 // ---------- private chats (the first message is a request the other person must accept) ----------
+// GET /api/people/chats/unread -> how many new message requests and unread messages I have
+router.get('/chats/unread', auth, ready, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT
+         (SELECT COUNT(*)::int FROM chat_requests c WHERE c.to_id = $1 AND c.status = 'pending') AS requests,
+         (SELECT COUNT(*)::int FROM direct_messages m JOIN chat_requests c ON c.id = m.chat_id
+            WHERE c.status = 'accepted' AND (c.from_id = $1 OR c.to_id = $1) AND m.sender_id <> $1
+              AND m.id > (CASE WHEN c.from_id = $1 THEN c.from_read ELSE c.to_read END)) AS messages`,
+      [req.user.id]
+    );
+    res.json(r.rows[0]);
+  } catch (e) {
+    console.error('unread failed:', e);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // GET /api/people/chats -> everything that belongs to me, newest first (declined requests are hidden)
 router.get('/chats', auth, ready, async (req, res) => {
   try {
