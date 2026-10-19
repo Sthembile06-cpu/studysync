@@ -3,6 +3,10 @@ const router = express.Router();
 const pool = require('../config/db');
 const auth = require('../middleware/auth');
 
+// "About you": the text saved from the profile screen. If the existing profile code keeps it in users.bio,
+// read it from there too, so nobody has to save again.
+let BIO_EXPR = 'e.bio';
+
 // ---------- one-time setup: new tables only, nothing existing is changed ----------
 let tablesReady = null;
 function ensureTables() {
@@ -55,6 +59,10 @@ function ensureTables() {
           body TEXT NOT NULL,
           created_at TIMESTAMPTZ DEFAULT NOW()
         )`);
+      const col = await pool.query(
+        `SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'bio'`
+      );
+      BIO_EXPR = col.rows.length > 0 ? `COALESCE(NULLIF(e.bio, ''), u.bio)` : 'e.bio';
     })().catch((err) => { tablesReady = null; throw err; });
   }
   return tablesReady;
@@ -114,7 +122,7 @@ router.get('/tutors', auth, ready, async (req, res) => {
   const q = String(req.query.q || '').trim().slice(0, 100);
   try {
     const r = await pool.query(
-      `SELECT u.id, u.name, e.avatar_url, e.bio,
+      `SELECT u.id, u.name, e.avatar_url, ${BIO_EXPR} AS bio,
               COALESCE((SELECT array_agg(tm.module ORDER BY tm.module) FROM tutor_modules tm WHERE tm.tutor_id = u.id), '{}') AS modules,
               ${AVG} AS avg_rating, ${CNT} AS rating_count,
               (SELECT COUNT(*)::int FROM groups g WHERE g.tutor_id = u.id) AS group_count
@@ -139,7 +147,7 @@ router.get('/students', auth, ready, async (req, res) => {
   const q = String(req.query.q || '').trim().slice(0, 100);
   try {
     const r = await pool.query(
-      `SELECT u.id, u.name, e.avatar_url, e.bio, s.course, s.academic_year
+      `SELECT u.id, u.name, e.avatar_url, ${BIO_EXPR} AS bio, s.course, s.academic_year
        FROM users u
        LEFT JOIN user_profile_ext e ON e.user_id = u.id
        LEFT JOIN student_academic_info s ON s.user_id = u.id
@@ -164,7 +172,7 @@ router.get('/brief', auth, ready, async (req, res) => {
   try {
     const r = await pool.query(
       `SELECT u.id, u.name, (CASE WHEN u.role = 'tutor' THEN 'tutor' ELSE 'student' END) AS role,
-              e.avatar_url, e.bio,
+              e.avatar_url, ${BIO_EXPR} AS bio,
               (CASE WHEN u.role = 'tutor' THEN u.email ELSE NULL END) AS email,
               (CASE WHEN e.show_phone THEN e.phone ELSE NULL END) AS phone,
               s.course, s.academic_year,
@@ -285,12 +293,19 @@ router.get('/profile/:id', auth, ready, async (req, res) => {
     const role = user.role === 'tutor' ? 'tutor' : 'student';
 
     const ext = (await pool.query('SELECT phone, show_phone, avatar_url, bio FROM user_profile_ext WHERE user_id = $1', [id])).rows[0] || {};
+    let aboutText = ext.bio || null;
+    if (!aboutText && BIO_EXPR !== 'e.bio') {
+      try {
+        const b = await pool.query('SELECT bio FROM users WHERE id = $1', [id]);
+        aboutText = (b.rows[0] && b.rows[0].bio) || null;
+      } catch (e) { /* no bio column: nothing to add */ }
+    }
     const out = {
       id: user.id,
       name: user.name,
       role,
       avatar_url: ext.avatar_url || null,
-      bio: ext.bio || null,
+      bio: aboutText,
       email: role === 'tutor' ? user.email : null, // tutors share their email; student emails stay private
       phone: ext.show_phone && ext.phone ? ext.phone : null,
       chat: relation(await pairRow(me, id), me)
